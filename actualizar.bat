@@ -1,15 +1,12 @@
-@echo off
-REM Cambiar al directorio del proyecto
-cd "c:\01 academico\001 Doctorado Economia UCAB\d tesis problema ahorro\5.4 experimentos\cuestionario\proyecto_encuesta"
-
-REM Añadir todos los cambios al área de preparación
+cd "c:/01 academico/001 Doctorado Economia UCAB/d tesis problema ahorro/5.4 experimentos/cuestionario/proyecto_encuesta/"
 git add .
-
-REM Hacer commit con un mensaje automático
-git commit -m "Actualización automática"
-
-REM Subir los cambios al repositorio remoto
+git commit -m "Actualización de código"
 git push origin main
 
-echo Cambios subidos a GitHub correctamente.
+IF %ERRORLEVEL% EQU 0 (
+    echo "Cambios subidos exitosamente a GitHub"
+) ELSE (
+    echo "No hay cambios nuevos para subir o ocurrió un error"
+)
 pause
+
