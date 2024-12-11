@@ -68,6 +68,12 @@ def guardar_respuestas(respuestas):
 def mostrar_encuesta():
     respuestas = {}
 
+    # Mostrar el logo de la universidad de forma creativa
+    st.image('logo_ucab.jpg', width=300,
+             caption="Universidad Católica Andrés Bello", use_column_width=True)
+    st.markdown("<h1 style='text-align: center; color: #4CAF50;'>Encuesta sobre el comportamiento de ahorro</h1>",
+                unsafe_allow_html=True)
+
     # Mostrar los datos demográficos en forma horizontal
     sexo = st.radio("Sexo:", ['M - Masculino', 'F - Femenino',
                     'O - Otro'], key='sexo', horizontal=True)
