@@ -22,8 +22,11 @@ def generar_id():
     return random.randint(100000, 999999)
 
 
-# Cargar las preguntas del archivo de Excel
-df_preguntas = pd.read_excel('preguntas.xlsx')
+# Cargar las preguntas del archivo de Excel, sin encabezados en la primera fila
+df_preguntas = pd.read_excel('preguntas.xlsx', header=None)
+
+# Asignar nombres a las columnas basados en la estructura que necesitas
+df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
 
 # Función para guardar las respuestas en Firebase
 
@@ -90,13 +93,15 @@ def mostrar_encuesta():
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = row['posibles respuestas'].split(',')
+        escala = row['posibles_respuestas'].split(',')
 
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
-        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
+        # Mostrar las opciones de la pregunta sin ninguna opción seleccionada
+        respuesta = st.radio(f"Selecciona una opción",
+                             escala, key=f'AV{pregunta_id}')
         respuestas[f'AV{pregunta_id}'] = respuesta
 
     # Botón para enviar las respuestas
