@@ -10,9 +10,11 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase
-cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-initialize_app(cred)
+# Inicializar Firebase (comprobar si ya está inicializado)
+if not firestore.client():
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+    initialize_app(cred)
+
 db = firestore.client()
 
 # Función para generar un ID aleatorio
