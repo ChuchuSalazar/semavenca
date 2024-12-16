@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import credentials, firestore, initialize_app, get_app
 import os
 from dotenv import load_dotenv
 
@@ -10,9 +10,16 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase
-cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-initialize_app(cred)
+# Inicializar Firebase, pero solo si no se ha inicializado previamente
+try:
+    # Intentamos obtener la app predeterminada
+    app = get_app()
+except ValueError as e:
+    # Si no existe una app inicializada, la inicializamos
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+    app = initialize_app(cred)
+
+# Conectar a la base de datos Firestore
 db = firestore.client()
 
 # Función para generar un ID aleatorio
@@ -28,7 +35,7 @@ url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/p
 # Cargar las preguntas del archivo de Excel desde GitHub, sin usar la primera fila como encabezado
 df_preguntas = pd.read_excel(url_preguntas, header=None)
 
-# Asignar los nombres de las columnas: 'item', 'pregunta', 'escala' y 'posibles respuestas'
+# Asignar los nombres de las columnas: 'item', 'pregunta', 'escala' y 'posibles_respuestas'
 df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
 
 # Función para guardar las respuestas en Firebase
