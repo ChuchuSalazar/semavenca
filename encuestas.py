@@ -1,42 +1,17 @@
-import streamlit as st
 import pandas as pd
-import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app, get_app
-import os
-from dotenv import load_dotenv
-
-# Cargar variables de entorno
-load_dotenv()
-FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
-
-# Inicializar Firebase solo si no está inicializado
-try:
-    app = get_app()
-except ValueError:
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
-
-db = firestore.client(app)
-
-# Función para generar un ID aleatorio
-
-
-def generar_id():
-    return random.randint(100000, 999999)
-
-
-# Cargar las preguntas del archivo de Excel
-df_preguntas = pd.read_excel('preguntas.xlsx')
+from firebase_admin import firestore
+import random
 
 # Función para guardar las respuestas en Firebase
 
 
 def guardar_respuestas(respuestas):
+    # Generar un ID único para la encuesta
     id_encuesta = generar_id()
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # Crear un diccionario con todas las respuestas y los datos adicionales
+    # Crear un diccionario con los datos adicionales
     data = {
         'ID': id_encuesta,
         'FECHA': fecha,
@@ -47,87 +22,85 @@ def guardar_respuestas(respuestas):
         'NIVEL_PROF': respuestas.get('nivel_educativo', ''),
     }
 
-    # Añadir las respuestas de las preguntas
-    for i, pregunta_id in enumerate(df_preguntas['item']):
-        # Guardar como número
-        data[f'AV{i+1}'] = int(respuestas.get(f'AV{pregunta_id}', 0))
+    # Leer el archivo de preguntas con la información de las escalas
+    df_preguntas = pd.read_excel('preguntas.xlsx')
 
-    # Guardar en Firebase
+    # Orden estricto de las preguntas y sesgos
+    preguntas_ordenadas = [
+        "AV1", "AV2", "AV3", "AV4", "AV5",  # Aversión a la pérdida
+        "SQ1", "SQ2", "SQ3", "SQ4", "SQ5",  # Status quo
+        "DH1", "DH2", "DH3", "DH4", "DH5",  # Descuento hiperbólico
+        "CM1", "CM2", "CM3", "CM4", "CM5"   # Contabilidad mental
+    ]
+
+    # Mapear las respuestas de las escalas a sus valores numéricos
+    def escala_a_numero(escala, respuesta_texto):
+        opciones = escala.split(",")
+        try:
+            # Verificar si la respuesta está dentro de las opciones disponibles
+            if respuesta_texto not in opciones:
+                raise ValueError(f"Respuesta no válida: {
+                                 respuesta_texto} para la escala {escala}")
+            return opciones.index(respuesta_texto) + 1  # Convertir a número
+        except ValueError:
+            return None
+
+    # Añadir las respuestas de las preguntas al diccionario
+    for pregunta in preguntas_ordenadas:
+        # Obtener la respuesta en texto
+        respuesta_texto = respuestas.get(pregunta, '')
+
+        # Buscar el tipo de escala y las opciones para la pregunta en el DataFrame
+        pregunta_info = df_preguntas[df_preguntas['item'] == pregunta]
+        if not pregunta_info.empty:
+            # Obtener las opciones de respuesta
+            escala = pregunta_info.iloc[0]['posibles_respuestas']
+        else:
+            escala = 'No disponible'
+
+        # Convertir la respuesta según el tipo de escala
+        respuesta_numerica = escala_a_numero(escala, respuesta_texto)
+
+        if respuesta_numerica is None:
+            # Si alguna pregunta no fue respondida o tiene una respuesta inválida
+            raise ValueError(
+                f"La pregunta {pregunta} no tiene una respuesta válida.")
+        data[pregunta] = respuesta_numerica
+
+    # Guardar los datos estrictos en Firebase
     db.collection('respuestas').document(str(id_encuesta)).set(data)
 
-# Función para mostrar la encuesta
+    print(f"Respuestas de la encuesta {id_encuesta} guardadas correctamente.")
+
+# Función para generar un ID único
+
+
+def generar_id():
+    return random.randint(100000, 999999)
+
+# Ejemplo de uso en tu flujo de preguntas
 
 
 def mostrar_encuesta():
     respuestas = {}
 
-    # Mostrar el logo de la universidad
-    st.image('logo_ucab.jpg', width=150,
-             caption="Universidad Católica Andrés Bello")
+    # Cargar las preguntas desde el archivo de Excel
+    df_preguntas = pd.read_excel('preguntas.xlsx')
 
-    # Mostrar los datos demográficos
-    st.header("Datos Demográficos")
-
-    sexo = st.radio("Sexo:", ['1 - Masculino', '2 - Femenino',
-                    '3 - Otro'], key='sexo', horizontal=True)
-    respuestas['sexo'] = sexo.split()[0]
-
-    rango_edad = st.radio("Rango de edad:", [
-        '1 - 18-25', '2 - 26-35', '3 - 36-45', '4 - 46-60', '5 - Más de 60'], key='rango_edad', horizontal=True)
-    respuestas['rango_edad'] = rango_edad.split()[0]
-
-    rango_ingreso = st.radio("Rango de ingresos (US$):", [
-        '1 - 0-300', '2 - 301-700', '3 - 701-1100', '4 - 1101-1500', '5 - 1501-3000', '6 - Más de 3000'], key='rango_ingreso', horizontal=True)
-    respuestas['rango_ingreso'] = rango_ingreso.split()[0]
-
-    ciudad = st.selectbox("Ciudad:", ['1 - Ciudad A', '2 - Ciudad B',
-                          '3 - Ciudad C', '4 - Ciudad D', '5 - Ciudad E'], key='ciudad')
-    respuestas['ciudad'] = ciudad.split()[0]
-
-    nivel_educativo = st.radio("Nivel educativo:", [
-        '1 - Primaria', '2 - Secundaria', '3 - Universitario', '4 - Postgrado'], key='nivel_educativo', horizontal=True)
-    respuestas['nivel_educativo'] = nivel_educativo.split()[0]
-
-    # Mostrar las preguntas numeradas y enmarcadas
-    st.header("Preguntas de la Encuesta")
-
-    preguntas_faltantes = []
+    # Mostrar las preguntas y respuestas
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = ['Totalmente en desacuerdo', 'En desacuerdo',
-                  'Neutral', 'De acuerdo', 'Totalmente de acuerdo']
+        escala = row['posibles_respuestas'].split(',')
 
-        st.markdown(f"**Pregunta {i+1}:**")
-        st.markdown(
-            f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
-                pregunta_texto}</div>',
-            unsafe_allow_html=True,
-        )
-
-        # El valor por defecto será None, obligando al usuario a seleccionar algo
-        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}', index=None)
+        # Mostrar la pregunta
+        respuesta = st.radio(
+            f"**Pregunta {i+1}:** {pregunta_texto}", escala, key=f'AV{pregunta_id}')
         respuestas[f'AV{pregunta_id}'] = respuesta
-
-        # Validar si la respuesta está vacía
-        if respuesta is None:
-            preguntas_faltantes.append(f"Pregunta {i+1}")
 
     # Botón para enviar las respuestas
     if st.button("Enviar"):
-        if preguntas_faltantes:
-            st.error(
-                f"Por favor, responde las siguientes preguntas antes de enviar: {
-                    ', '.join(preguntas_faltantes)}"
-            )
-        else:
-            # Validar que todas las respuestas sean válidas
-            guardar_respuestas(respuestas)
-            st.balloons()
-            st.success(
-                "Gracias por completar la encuesta. ¡Tu respuesta ha sido registrada!")
-
-
-# Llamar la función para mostrar la encuesta
-if __name__ == '__main__':
-    mostrar_encuesta()
+        guardar_respuestas(respuestas)
+        st.balloons()
+        st.success(
+            "Gracias por completar la encuesta. ¡Tu respuesta ha sido registrada!")
