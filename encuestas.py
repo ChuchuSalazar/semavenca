@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import credentials, firestore, initialize_app, get_app
 import os
 from dotenv import load_dotenv
 
@@ -10,10 +10,16 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase
-cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-initialize_app(cred)
-db = firestore.client()
+# Inicializar Firebase solo si no está inicializado
+try:
+    # Intenta obtener la app predeterminada
+    app = get_app()
+except ValueError:
+    # Si no existe, inicializa la app
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+    app = initialize_app(cred)
+
+db = firestore.client(app)
 
 # Función para generar un ID aleatorio
 
@@ -22,17 +28,13 @@ def generar_id():
     return random.randint(100000, 999999)
 
 
-# Cargar las preguntas del archivo de Excel, sin encabezados en la primera fila
-df_preguntas = pd.read_excel('preguntas.xlsx', header=None)
-
-# Asignar nombres a las columnas basados en la estructura que necesitas
-df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
+# Cargar las preguntas del archivo de Excel
+df_preguntas = pd.read_excel('preguntas.xlsx')
 
 # Función para guardar las respuestas en Firebase
 
 
 def guardar_respuestas(respuestas):
-    # Asegurando un ID coherente con la estructura
     id_encuesta = f"ID_{generar_id()}"
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -93,15 +95,13 @@ def mostrar_encuesta():
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = row['posibles_respuestas'].split(',')
+        escala = row['posibles respuestas'].split(',')
 
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
-        # Mostrar las opciones de la pregunta sin ninguna opción seleccionada
-        respuesta = st.radio(f"Selecciona una opción",
-                             escala, key=f'AV{pregunta_id}')
+        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
         respuestas[f'AV{pregunta_id}'] = respuesta
 
     # Botón para enviar las respuestas
