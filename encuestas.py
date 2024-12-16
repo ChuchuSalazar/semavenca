@@ -95,7 +95,8 @@ def mostrar_encuesta():
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
-        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
+        # Establecer `index=-1` para no tener ninguna opción seleccionada por defecto
+        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}', index=-1)
         respuestas[f'AV{pregunta_id}'] = respuesta
 
     # Botón para enviar las respuestas
