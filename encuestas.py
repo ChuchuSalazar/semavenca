@@ -31,6 +31,9 @@ def generar_id():
 # Cargar las preguntas del archivo de Excel
 df_preguntas = pd.read_excel('preguntas.xlsx')
 
+# Imprimir las primeras filas del DataFrame para depuración
+print(df_preguntas.head())
+
 # Función para guardar las respuestas en Firebase
 
 
@@ -51,7 +54,9 @@ def guardar_respuestas(respuestas):
 
     # Añadir las respuestas de las preguntas
     for i, row in df_preguntas.iterrows():
-        data[f'AV{i+1}'] = respuestas.get(f'AV{row["item"]}', '')
+        pregunta_id = row['ITEM']
+        respuesta = respuestas.get(f'AV{pregunta_id}', '')
+        data[f'AV{pregunta_id}'] = respuesta
 
     # Guardar en Firebase
     db.collection('respuestas').document(str(id_encuesta)).set(data)
@@ -67,7 +72,7 @@ def mostrar_encuesta():
              caption="Universidad Católica Andrés Bello")
 
     # Mostrar los datos demográficos en forma horizontal
-    st.header("Datos Demográficos")
+    st.header("Información General")
     sexo = st.radio("Sexo:", ['M - Masculino', 'F - Femenino',
                     'O - Otro'], key='sexo', horizontal=True)
     respuestas['sexo'] = sexo.split()[0]
@@ -92,18 +97,24 @@ def mostrar_encuesta():
     st.header("Preguntas de la Encuesta")
 
     for i, row in df_preguntas.iterrows():
-        pregunta_id = row['item']
-        pregunta_texto = row['pregunta']
-        escala = row['escala']  # Número de opciones en la escala
-        posibles_respuestas = row['posibles_respuestas'].split(
-            ';')  # Respuestas separadas por punto y coma
+        pregunta_id = row['ITEM']
+        pregunta_texto = row['PREGUNTA']
+        escala = row['ESCALA']  # Número de opciones en la escala
+        # Usar .get() para evitar errores
+        posibles_respuestas = row.get('POSIBLES_RESPUESTAS', '')
+
+        if posibles_respuestas:
+            posibles_respuestas = posibles_respuestas.split(
+                ';')  # Dividir las opciones por punto y coma
+        else:
+            posibles_respuestas = []  # Si no hay respuestas posibles, asignar una lista vacía
 
         # Mostrar la pregunta
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
-        # Seleccionar las opciones de respuesta según la escala
+        # Mostrar las opciones de respuesta dependiendo de la escala
         if escala == 5:
             respuesta = st.radio("Seleccione una opción:",
                                  posibles_respuestas, key=f'AV{pregunta_id}')
@@ -125,8 +136,8 @@ def mostrar_encuesta():
     # Botón para enviar las respuestas
     if st.button("Enviar"):
         # Validar que todas las preguntas hayan sido respondidas
-        preguntas_faltantes = [f"Pregunta {i+1}" for i, row in df_preguntas.iterrows(
-        ) if respuestas.get(f'AV{row["item"]}', '') == 'No seleccionar']
+        preguntas_faltantes = [f"Pregunta {
+            i+1}" for i, row in df_preguntas.iterrows() if respuestas.get(f'AV{row["ITEM"]}', '') == '']
 
         if preguntas_faltantes:
             st.error(f"Por favor, responde las siguientes preguntas: {
