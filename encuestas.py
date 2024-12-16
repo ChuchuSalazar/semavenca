@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app, get_app
+from firebase_admin import credentials, firestore, initialize_app
 import os
 from dotenv import load_dotenv
 
@@ -10,16 +10,10 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase solo si no está inicializado
-try:
-    # Intenta obtener la app predeterminada
-    app = get_app()
-except ValueError:
-    # Si no existe, inicializa la app
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
-
-db = firestore.client(app)
+# Inicializar Firebase
+cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+initialize_app(cred)
+db = firestore.client()
 
 # Función para generar un ID aleatorio
 
@@ -28,13 +22,20 @@ def generar_id():
     return random.randint(100000, 999999)
 
 
-# Cargar las preguntas del archivo de Excel
-df_preguntas = pd.read_excel('preguntas.xlsx')
+# URL del archivo de preguntas en GitHub
+url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/preguntas.xlsx'
+
+# Cargar las preguntas del archivo de Excel desde GitHub, sin usar la primera fila como encabezado
+df_preguntas = pd.read_excel(url_preguntas, header=None)
+
+# Asignar los nombres de las columnas: 'item', 'pregunta', 'escala' y 'posibles respuestas'
+df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
 
 # Función para guardar las respuestas en Firebase
 
 
 def guardar_respuestas(respuestas):
+    # Asegurando un ID coherente con la estructura
     id_encuesta = f"ID_{generar_id()}"
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -95,20 +96,28 @@ def mostrar_encuesta():
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = row['posibles respuestas'].split(',')
+        escala = int(row['escala'])  # Número de opciones
+        posibles_respuestas = row['posibles_respuestas'].split(
+            ',')  # Dividir las respuestas por coma
 
+        # Crear una lista de opciones basadas en la escala
+        opciones = ['No seleccionado'] + \
+            posibles_respuestas[:escala]  # Añadir 'No seleccionado'
+
+        # Mostrar la pregunta
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
-        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
+        # Mostrar las opciones para cada pregunta
+        respuesta = st.radio(f"Respuesta:", opciones, key=f'AV{pregunta_id}')
         respuestas[f'AV{pregunta_id}'] = respuesta
 
     # Botón para enviar las respuestas
     if st.button("Enviar"):
         # Validar que todas las preguntas hayan sido respondidas
-        preguntas_faltantes = [f"Pregunta {
-            i+1}" for i, row in df_preguntas.iterrows() if not respuestas.get(f'AV{row["item"]}', None)]
+        preguntas_faltantes = [f"Pregunta {i+1}" for i, row in df_preguntas.iterrows(
+        ) if respuestas.get(f'AV{row["item"]}', None) == 'No seleccionado']
 
         if preguntas_faltantes:
             st.error(f"Por favor, responde las siguientes preguntas: {
