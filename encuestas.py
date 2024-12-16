@@ -1,90 +1,125 @@
-import random
-import datetime
-import os
 import streamlit as st
 import pandas as pd
-from firebase_admin import credentials, firestore, initialize_app
+import random
+import datetime
+from firebase_admin import credentials, firestore, initialize_app, get_app
+import os
 from dotenv import load_dotenv
 
-# Cargar las variables de entorno
+# Cargar variables de entorno
 load_dotenv()
+FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Cargar las preguntas desde el archivo de Excel
-# Asegúrate de que la primera fila son encabezados
-df_preguntas = pd.read_excel('preguntas.xlsx', header=0)
+# Inicializar Firebase solo si no está inicializado
+try:
+    # Intenta obtener la app predeterminada
+    app = get_app()
+except ValueError:
+    # Si no existe, inicializa la app
+    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+    app = initialize_app(cred)
 
-# Inicializar Firebase
-# Ruta a las credenciales de Firebase
-firebase_creds = os.getenv('FIREBASE_CREDS_PATH')
-cred = credentials.Certificate(firebase_creds)
-initialize_app(cred)
-db = firestore.client()
+db = firestore.client(app)
+
+# Función para generar un ID aleatorio
+
+
+def generar_id():
+    return random.randint(100000, 999999)
+
+
+# Cargar las preguntas del archivo de Excel
+df_preguntas = pd.read_excel('preguntas.xlsx')
+
+# Función para guardar las respuestas en Firebase
+
+
+def guardar_respuestas(respuestas):
+    id_encuesta = generar_id()
+    fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # Crear un diccionario con todas las respuestas y los datos adicionales
+    data = {
+        'ID': id_encuesta,
+        'FECHA': fecha,
+        'SEXO': respuestas.get('sexo', ''),
+        'RANGO_EDA': respuestas.get('rango_edad', ''),
+        'RANGO_INGRESO': respuestas.get('rango_ingreso', ''),
+        'CIUDAD': respuestas.get('ciudad', ''),
+        'NIVEL_PROF': respuestas.get('nivel_educativo', ''),
+    }
+
+    # Añadir las respuestas de las preguntas
+    for i, pregunta_id in enumerate(df_preguntas['item']):
+        data[f'AV{i+1}'] = respuestas.get(f'AV{pregunta_id}', '')
+
+    # Guardar en Firebase
+    db.collection('respuestas').document(str(id_encuesta)).set(data)
 
 # Función para mostrar la encuesta
 
 
 def mostrar_encuesta():
     respuestas = {}
-    preguntas_no_respondidas = []
 
-    # Aleatorizar el orden de las preguntas
-    df_preguntas = df_preguntas.sample(frac=1).reset_index(drop=True)
+    # Mostrar el logo de la universidad
+    st.image('logo_ucab.jpg', width=150,
+             caption="Universidad Católica Andrés Bello")
 
-    # Mostrar "Información General"
-    st.subheader("Información General")
-    st.write("Por favor, complete la encuesta a continuación.")
+    # Mostrar los datos demográficos en forma horizontal
+    st.header("Datos Demográficos")
+
+    sexo = st.radio("Sexo:", ['M - Masculino',
+                    'F - Femenino', 'O - Otro'], key='sexo')
+    respuestas['sexo'] = sexo.split()[0]
+
+    rango_edad = st.radio("Rango de edad:", [
+                          '1 - 18-25', '2 - 26-35', '3 - 36-45', '4 - 46-60', '5 - Más de 60'], key='rango_edad')
+    respuestas['rango_edad'] = rango_edad.split()[0]
+
+    rango_ingreso = st.radio("Rango de ingresos (US$):", [
+                             '1 - 0-300', '2 - 301-700', '3 - 701-1100', '4 - 1101-1500', '5 - 1501-3000', '6 - Más de 3000'], key='rango_ingreso')
+    respuestas['rango_ingreso'] = rango_ingreso.split()[0]
+
+    ciudad = st.selectbox("Ciudad:", ['1 - Ciudad A', '2 - Ciudad B',
+                          '3 - Ciudad C', '4 - Ciudad D', '5 - Ciudad E'], key='ciudad')
+    respuestas['ciudad'] = ciudad.split()[0]
+
+    nivel_educativo = st.radio("Nivel educativo:", [
+                               '1 - Primaria', '2 - Secundaria', '3 - Universitario', '4 - Postgrado'], key='nivel_educativo')
+    respuestas['nivel_educativo'] = nivel_educativo.split()[0]
+
+    # Mostrar las preguntas numeradas y enmarcadas
+    st.header("Preguntas de la Encuesta")
 
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = int(row['escala'])  # Escala debe ser convertido a int
-        posibles_respuestas = row['posibles_respuestas'].split(
-            ",")  # Opciones de respuesta
+        escala = ['No seleccionar'] + row['posibles respuestas'].split(',')
 
-        if i == 5:
-            st.subheader("Responda")
+        st.markdown(f"**Pregunta {i+1}:**")
+        st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
+                    pregunta_texto}</div>', unsafe_allow_html=True)
 
-        st.markdown(f"**Pregunta {i + 1}:** {pregunta_texto}")
+        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
+        respuestas[f'AV{pregunta_id}'] = respuesta
 
-        # Dependiendo de la escala, se presentan diferentes tipos de respuestas
-        if escala == 2:
-            respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
-                                 "Sí", "No"], key=f"q{i}", disabled=False)
-        elif escala == 3:
-            respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
-                                 "De acuerdo", "Neutral", "En desacuerdo"], key=f"q{i}", disabled=False)
-        elif escala == 4:
-            respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
-                                 "Muy en desacuerdo", "En desacuerdo", "De acuerdo", "Muy de acuerdo"], key=f"q{i}", disabled=False)
-        elif escala == 5:
-            respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
-                                 "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"], key=f"q{i}", disabled=False)
+    # Botón para enviar las respuestas
+    if st.button("Enviar"):
+        # Validar que todas las preguntas hayan sido respondidas
+        preguntas_faltantes = [f"Pregunta {i+1}" for i, row in df_preguntas.iterrows(
+        ) if respuestas.get(f'AV{row["item"]}', '') == 'No seleccionar']
 
-        respuestas[pregunta_id] = respuesta
-
-        if respuesta is None:
-            preguntas_no_respondidas.append(pregunta_id)
-
-    # Si todas las preguntas fueron respondidas, guardar las respuestas
-    if not preguntas_no_respondidas:
-        st.success("Gracias por completar la encuesta.")
-        st.balloons()
-
-        # Registrar la fecha y hora de la encuesta
-        fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        # Guardar las respuestas en Firebase
-        doc_ref = db.collection('respuestas').document()
-        doc_ref.set({
-            'respuestas': respuestas,
-            'fecha': fecha_actual
-        })
-
-    else:
-        # Si no se han respondido todas las preguntas
-        st.warning(
-            "Por favor, responde todas las preguntas. Las preguntas no respondidas están marcadas en rojo.")
+        if preguntas_faltantes:
+            st.error(f"Por favor, responde las siguientes preguntas: {
+                     ', '.join(preguntas_faltantes)}")
+        else:
+            guardar_respuestas(respuestas)
+            st.balloons()
+            st.success(
+                "Gracias por completar la encuesta. ¡Tu respuesta ha sido registrada!")
 
 
-# Llamar a la función para mostrar la encuesta
-mostrar_encuesta()
+# Llamar la función para mostrar la encuesta
+if __name__ == '__main__':
+    mostrar_encuesta()
