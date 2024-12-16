@@ -10,12 +10,12 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase, pero solo si no se ha inicializado previamente
+# Inicializar Firebase solo una vez
 try:
     app = get_app()
-except ValueError as e:
+except ValueError:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
+    initialize_app(cred)
 
 # Conectar a Firestore
 db = firestore.client()
@@ -66,22 +66,14 @@ def mostrar_encuesta():
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Inicializar el estilo de la pregunta
-        estilo_borde = f"2px solid blue"  # Borde azul por defecto
-        texto_bold = ""
-
-        # Si la pregunta no ha sido respondida antes, añadir a respuestas
-        if pregunta_id not in respuestas:
-            respuestas[pregunta_id] = None
-
-        # Validación dinámica: marcar las preguntas sin respuesta
+        # Validación dinámica: marcar preguntas no respondidas
+        estilo_borde = "2px solid blue"  # Borde azul por defecto
         if st.session_state.get(f"respuesta_{pregunta_id}", None) is None and pregunta_id in preguntas_faltantes:
-            estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
-            texto_bold = "font-weight: bold;"  # Texto en negrita
+            estilo_borde = "3px solid red"  # Borde rojo si falta responder
 
-        # Mostrar la pregunta con estilo
+        # Mostrar la pregunta con estilo de borde
         st.markdown(
-            f"""<div style="border: {estilo_borde}; padding: 10px; border-radius: 5px; {texto_bold}">
+            f"""<div style="border: {estilo_borde}; padding: 10px; border-radius: 5px;">
                     {pregunta_texto}
                 </div>""",
             unsafe_allow_html=True,
@@ -106,11 +98,31 @@ def mostrar_encuesta():
             if respuestas[pregunta_id] is None:
                 preguntas_faltantes.append((i + 1, pregunta_id))
 
-        # Si hay preguntas faltantes, mostrar advertencias
+        # Si hay preguntas faltantes, mostrar un modal con un mensaje
         if preguntas_faltantes:
-            st.error("Por favor, responda las siguientes preguntas:")
-            for num_pregunta, _ in preguntas_faltantes:
-                st.write(f"❗ Pregunta {num_pregunta}")
+            faltantes = ", ".join([str(num_pregunta)
+                                  for num_pregunta, _ in preguntas_faltantes])
+            st.error(
+                "❗ Por favor, responda las preguntas resaltadas en rojo antes de continuar.")
+
+            # Mostrar una ventana modal personalizada
+            st.markdown(
+                f"""
+                <div style="position: fixed; top: 20%; left: 30%;
+                background-color: #f8d7da; color: #721c24; padding: 20px;
+                #f5c6cb; box-shadow: 2px 2px 10px gray;">
+                border-radius: 10px; border: 2px solid
+                    <h4 style="margin-bottom: 10px;">Preguntas Sin Responder</h4>
+                    <p>Faltan por responder las siguientes preguntas: <b>{faltantes}</b></p>
+                    <button onclick="window.location.reload()"
+                    style="background-color: #007bff; color: white; border: none;
+                    padding: 10px; border-radius: 5px; cursor: pointer;">
+                    Aceptar</button>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
         else:
             # Guardar las respuestas en Firebase
             guardar_respuestas(respuestas)
