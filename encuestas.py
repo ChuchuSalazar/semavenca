@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app
+from firebase_admin import credentials, firestore, initialize_app, get_app, FirebaseError
 import os
 from dotenv import load_dotenv
 
@@ -10,12 +10,16 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase (comprobar si ya está inicializado)
-if not firestore.client():
+# Inicializar Firebase solo si no está inicializado
+try:
+    # Intenta obtener la app predeterminada
+    app = get_app()
+except FirebaseError:
+    # Si no existe, inicializa la app
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    initialize_app(cred)
+    app = initialize_app(cred)
 
-db = firestore.client()
+db = firestore.client(app)
 
 # Función para generar un ID aleatorio
 
