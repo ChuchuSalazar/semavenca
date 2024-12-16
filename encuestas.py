@@ -52,13 +52,35 @@ def guardar_respuestas(respuestas):
 
 def mostrar_encuesta():
     st.title("Encuesta de Hábitos de Ahorro")
-    st.write("Por favor, responda todas las preguntas obligatorias.")
+    st.write("Por favor, complete todas las preguntas obligatorias.")
 
     # Diccionario para respuestas
     respuestas = {}
-    preguntas_faltantes = []  # Para rastrear preguntas sin responder
+    preguntas_faltantes = []
 
-    # Sección de preguntas
+    # Sección demográfica
+    st.header("Información Demográfica")
+    datos_demograficos = {
+        'Sexo': ['Masculino', 'Femenino', 'Otro'],
+        'Ciudad': ['Ciudad A', 'Ciudad B', 'Ciudad C'],
+        'Escala de Edad': ['18-25', '26-35', '36-50', '51+'],
+        'Escala de Ingresos': ['Bajo', 'Medio', 'Alto'],
+        'Nivel Profesional': ['Primaria', 'Secundaria', 'Universitario', 'Postgrado']
+    }
+
+    for pregunta, opciones in datos_demograficos.items():
+        respuesta = st.selectbox(
+            f"**{pregunta}**",
+            ['Seleccione una opción'] + opciones,
+            index=0,
+            key=f"demografico_{pregunta}"
+        )
+        if respuesta == 'Seleccione una opción':
+            respuestas[pregunta] = None
+        else:
+            respuestas[pregunta] = respuesta
+
+    # Preguntas principales
     st.header("Preguntas de la Encuesta")
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
@@ -66,12 +88,12 @@ def mostrar_encuesta():
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Estilo dinámico de borde
-        estilo_borde = "2px solid blue"  # Azul por defecto
+        # Estilo dinámico de borde (inicialmente azul)
+        estilo_borde = "2px solid blue"
         if st.session_state.get(f"respuesta_{pregunta_id}", None) is None:
-            estilo_borde = "3px solid red"  # Rojo si falta responder
+            estilo_borde = "2px solid blue"
 
-        # Mostrar la pregunta con HTML personalizado
+        # Pregunta
         st.markdown(
             f"""
             <div style="border: {estilo_borde}; padding: 10px; margin-bottom: 10px;
@@ -82,7 +104,7 @@ def mostrar_encuesta():
             unsafe_allow_html=True
         )
 
-        # Opciones de respuesta
+        # Opciones
         respuesta = st.radio(
             f"Pregunta {i+1}:",
             opciones,
@@ -91,19 +113,25 @@ def mostrar_encuesta():
         )
         respuestas[pregunta_id] = respuesta
 
-    # Botón para enviar
+    # Botón de enviar
     if st.button("Enviar"):
         preguntas_faltantes.clear()
 
         # Validar preguntas no respondidas
+        for key, value in respuestas.items():
+            if value is None:
+                preguntas_faltantes.append(key)
+
+        # Cambiar estilo si hay faltantes
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
-            if respuestas[pregunta_id] is None:
-                preguntas_faltantes.append(i + 1)
+            if pregunta_id in preguntas_faltantes:
+                st.session_state[f"respuesta_{
+                    pregunta_id}_borde"] = "3px solid red"
 
-        # Mostrar "ventana emergente simulada" si hay preguntas faltantes
+        # Ventana emergente simulada si hay preguntas faltantes
         if preguntas_faltantes:
-            faltantes = ", ".join([str(num) for num in preguntas_faltantes])
+            faltantes_texto = ", ".join([str(f) for f in preguntas_faltantes])
             st.markdown(
                 f"""
                 <div style="
@@ -112,7 +140,7 @@ def mostrar_encuesta():
                     border: 3px solid red; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.3);
                     border-radius: 10px;">
                     <h4 style="color: red;">❗ Preguntas Sin Responder</h4>
-                    <p>Por favor, responda las siguientes preguntas: <b>{faltantes}</b></p>
+                    <p>Por favor, responda las siguientes preguntas: <b>{faltantes_texto}</b></p>
                     <button onclick="window.location.reload()"
                         style="background-color: #007bff; color: white; padding: 10px 20px;
                         border: none; border-radius: 5px; cursor: pointer;">
@@ -122,7 +150,6 @@ def mostrar_encuesta():
                 """,
                 unsafe_allow_html=True
             )
-
         else:
             guardar_respuestas(respuestas)
             st.success("¡Gracias por completar la encuesta!")
@@ -130,6 +157,6 @@ def mostrar_encuesta():
             st.stop()
 
 
-# Ejecutar la encuesta
+# Ejecutar
 if __name__ == '__main__':
     mostrar_encuesta()
