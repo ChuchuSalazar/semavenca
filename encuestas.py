@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app, get_app, FirebaseError
+from firebase_admin import credentials, firestore, initialize_app, get_app
 import os
 from dotenv import load_dotenv
 
@@ -14,7 +14,7 @@ FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 try:
     # Intenta obtener la app predeterminada
     app = get_app()
-except FirebaseError:
+except ValueError:
     # Si no existe, inicializa la app
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
     app = initialize_app(cred)
