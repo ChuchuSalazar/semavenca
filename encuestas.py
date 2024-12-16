@@ -1,11 +1,24 @@
+import random
+import datetime
+import os
 import streamlit as st
 import pandas as pd
+from firebase_admin import credentials, firestore, initialize_app
+from dotenv import load_dotenv
 
-# Cargar las preguntas desde el archivo de Excel sin encabezados
-df_preguntas = pd.read_excel('preguntas.xlsx', header=None)
+# Cargar las variables de entorno
+load_dotenv()
 
-# Asignar nombres a las columnas manualmente, ya que no hay encabezados
-df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
+# Cargar las preguntas desde el archivo de Excel
+# Asegúrate de que la primera fila son encabezados
+df_preguntas = pd.read_excel('preguntas.xlsx', header=0)
+
+# Inicializar Firebase
+# Ruta a las credenciales de Firebase
+firebase_creds = os.getenv('FIREBASE_CREDS_PATH')
+cred = credentials.Certificate(firebase_creds)
+initialize_app(cred)
+db = firestore.client()
 
 # Función para mostrar la encuesta
 
@@ -14,49 +27,63 @@ def mostrar_encuesta():
     respuestas = {}
     preguntas_no_respondidas = []
 
+    # Aleatorizar el orden de las preguntas
+    df_preguntas = df_preguntas.sample(frac=1).reset_index(drop=True)
+
+    # Mostrar "Información General"
+    st.subheader("Información General")
+    st.write("Por favor, complete la encuesta a continuación.")
+
     for i, row in df_preguntas.iterrows():
-        # Acceder a las columnas por su nombre después de asignar los nombres manualmente
-        pregunta_id = row['item']  # Columna A (ITEM)
-        pregunta_texto = row['pregunta']  # Columna B (PREGUNTA)
-        escala = row['escala']  # Columna C (ESCALA)
+        pregunta_id = row['item']
+        pregunta_texto = row['pregunta']
+        escala = int(row['escala'])  # Escala debe ser convertido a int
         posibles_respuestas = row['posibles_respuestas'].split(
-            ",")  # Columna D (POSIBLES_RESPUESTAS)
+            ",")  # Opciones de respuesta
 
-        # Mostrar la pregunta en Streamlit
-        st.write(f"{pregunta_id}. {pregunta_texto}")
+        if i == 5:
+            st.subheader("Responda")
 
-        # Crear las opciones basadas en la escala
-        opciones = []
-        for opcion in posibles_respuestas:
-            num, texto = opcion.split(":")
-            opciones.append(f"{num.strip()}: {texto.strip()}")
+        st.markdown(f"**Pregunta {i + 1}:** {pregunta_texto}")
 
-        # Usar selectbox o radio button según la escala
-        if int(escala) == 2:
-            respuesta = st.radio(
-                f"Seleccione: {pregunta_texto}", options=["Sí", "No"])
-        elif int(escala) == 3:
+        # Dependiendo de la escala, se presentan diferentes tipos de respuestas
+        if escala == 2:
             respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
-                                 "De acuerdo", "Neutral", "En desacuerdo"])
-        elif int(escala) == 4:
+                                 "Sí", "No"], key=f"q{i}", disabled=False)
+        elif escala == 3:
             respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
-                                 "Muy en desacuerdo", "En desacuerdo", "De acuerdo", "Muy de acuerdo"])
-        elif int(escala) == 5:
+                                 "De acuerdo", "Neutral", "En desacuerdo"], key=f"q{i}", disabled=False)
+        elif escala == 4:
             respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
-                                 "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"])
+                                 "Muy en desacuerdo", "En desacuerdo", "De acuerdo", "Muy de acuerdo"], key=f"q{i}", disabled=False)
+        elif escala == 5:
+            respuesta = st.radio(f"Seleccione: {pregunta_texto}", options=[
+                                 "Totalmente en desacuerdo", "En desacuerdo", "Neutral", "De acuerdo", "Totalmente de acuerdo"], key=f"q{i}", disabled=False)
 
         respuestas[pregunta_id] = respuesta
 
-    # Validar que se hayan respondido todas las preguntas
-    for pregunta_id, respuesta in respuestas.items():
         if respuesta is None:
             preguntas_no_respondidas.append(pregunta_id)
 
-    if preguntas_no_respondidas:
-        st.warning(f"Las siguientes preguntas no han sido respondidas: {
-                   ', '.join(preguntas_no_respondidas)}")
-    else:
+    # Si todas las preguntas fueron respondidas, guardar las respuestas
+    if not preguntas_no_respondidas:
         st.success("Gracias por completar la encuesta.")
+        st.balloons()
+
+        # Registrar la fecha y hora de la encuesta
+        fecha_actual = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Guardar las respuestas en Firebase
+        doc_ref = db.collection('respuestas').document()
+        doc_ref.set({
+            'respuestas': respuestas,
+            'fecha': fecha_actual
+        })
+
+    else:
+        # Si no se han respondido todas las preguntas
+        st.warning(
+            "Por favor, responde todas las preguntas. Las preguntas no respondidas están marcadas en rojo.")
 
 
 # Llamar a la función para mostrar la encuesta
