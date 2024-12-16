@@ -66,25 +66,28 @@ def mostrar_encuesta():
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Validación dinámica: marcar preguntas no respondidas
-        estilo_borde = "2px solid blue"  # Borde azul por defecto
-        if st.session_state.get(f"respuesta_{pregunta_id}", None) is None and pregunta_id in preguntas_faltantes:
-            estilo_borde = "3px solid red"  # Borde rojo si falta responder
+        # Estilo dinámico de borde
+        estilo_borde = "2px solid blue"  # Azul por defecto
+        if st.session_state.get(f"respuesta_{pregunta_id}", None) is None:
+            estilo_borde = "3px solid red"  # Rojo si falta responder
 
-        # Mostrar la pregunta con estilo de borde
+        # Mostrar la pregunta con HTML personalizado
         st.markdown(
-            f"""<div style="border: {estilo_borde}; padding: 10px; border-radius: 5px;">
-                    {pregunta_texto}
-                </div>""",
-            unsafe_allow_html=True,
+            f"""
+            <div style="border: {estilo_borde}; padding: 10px; margin-bottom: 10px;
+                        border-radius: 5px; background-color: #f9f9f9;">
+                {pregunta_texto}
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-        # Crear opciones de respuesta
+        # Opciones de respuesta
         respuesta = st.radio(
-            f"Seleccione una opción para la Pregunta {i+1}:",
+            f"Pregunta {i+1}:",
             opciones,
-            index=None,  # No hay selección por defecto
-            key=f"respuesta_{pregunta_id}",
+            index=None,
+            key=f"respuesta_{pregunta_id}"
         )
         respuestas[pregunta_id] = respuesta
 
@@ -92,45 +95,38 @@ def mostrar_encuesta():
     if st.button("Enviar"):
         preguntas_faltantes.clear()
 
-        # Validar respuestas
+        # Validar preguntas no respondidas
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
             if respuestas[pregunta_id] is None:
-                preguntas_faltantes.append((i + 1, pregunta_id))
+                preguntas_faltantes.append(i + 1)
 
-        # Si hay preguntas faltantes, mostrar un modal con un mensaje
+        # Mostrar "ventana emergente simulada" si hay preguntas faltantes
         if preguntas_faltantes:
-            faltantes = ", ".join([str(num_pregunta)
-                                  for num_pregunta, _ in preguntas_faltantes])
-            st.error(
-                "❗ Por favor, responda las preguntas resaltadas en rojo antes de continuar.")
-
-            # Mostrar una ventana modal personalizada
+            faltantes = ", ".join([str(num) for num in preguntas_faltantes])
             st.markdown(
                 f"""
-                <div style="position: fixed; top: 20%; left: 30%;
-                background-color: #f8d7da; color: #721c24; padding: 20px;
-                #f5c6cb; box-shadow: 2px 2px 10px gray;">
-                border-radius: 10px; border: 2px solid
-                    <h4 style="margin-bottom: 10px;">Preguntas Sin Responder</h4>
-                    <p>Faltan por responder las siguientes preguntas: <b>{faltantes}</b></p>
+                <div style="
+                    position: fixed; top: 30%; left: 20%; right: 20%; z-index: 9999;
+                    background-color: white; padding: 20px; text-align: center;
+                    border: 3px solid red; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.3);
+                    border-radius: 10px;">
+                    <h4 style="color: red;">❗ Preguntas Sin Responder</h4>
+                    <p>Por favor, responda las siguientes preguntas: <b>{faltantes}</b></p>
                     <button onclick="window.location.reload()"
-                    style="background-color: #007bff; color: white; border: none;
-                    padding: 10px; border-radius: 5px; cursor: pointer;">
-                    Aceptar</button>
+                        style="background-color: #007bff; color: white; padding: 10px 20px;
+                        border: none; border-radius: 5px; cursor: pointer;">
+                        Aceptar
+                    </button>
                 </div>
                 """,
-                unsafe_allow_html=True,
+                unsafe_allow_html=True
             )
 
         else:
-            # Guardar las respuestas en Firebase
             guardar_respuestas(respuestas)
             st.success("¡Gracias por completar la encuesta!")
             st.balloons()
-
-            # Bloquear preguntas después del envío
-            st.write("La encuesta ha sido enviada exitosamente.")
             st.stop()
 
 
