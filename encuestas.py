@@ -98,7 +98,8 @@ def mostrar_encuesta():
     # Mostrar las preguntas numeradas y enmarcadas
     st.header("Preguntas de la Encuesta")
 
-    preguntas_faltantes = []  # Lista para preguntas no respondidas
+    # Diccionario para almacenar el borde de las preguntas
+    bordes = {}
 
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
@@ -111,27 +112,34 @@ def mostrar_encuesta():
         # Sin la opción de "No responder"
         opciones = posibles_respuestas[:escala]
 
-        # Verificar si la pregunta ha sido respondida
-        if respuestas.get(f'AV{pregunta_id}', '') == '':
-            preguntas_faltantes.append(i)
+        # Establecer el borde inicial a azul (delgado)
+        borde = '2px solid blue'
 
-        # Cambiar el color del recuadro según la respuesta
-        border_color = 'red' if respuestas.get(
-            f'AV{pregunta_id}', '') == '' else 'blue'
-        border_style = '3px solid' if border_color == 'red' else '2px solid'
-
-        # Mostrar la pregunta con el color del borde
+        # Mostrar la pregunta con el borde
         st.markdown(f"**Pregunta {i+1}:**")
-        st.markdown(f'<div style="border: {border_style} {
-                    border_color}; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{pregunta_texto}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="border: {
+                    borde}; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{pregunta_texto}</div>', unsafe_allow_html=True)
 
         # Mostrar las opciones para cada pregunta
         respuesta = st.radio(f"Respuesta:", opciones, key=f'AV{pregunta_id}')
         respuestas[f'AV{pregunta_id}'] = respuesta
 
+        # Almacenar el borde para validación después de hacer clic en "Enviar"
+        bordes[pregunta_id] = borde
+
     # Botón para enviar las respuestas
     if st.button("Enviar"):
         # Validar que todas las preguntas hayan sido respondidas
+        preguntas_faltantes = []  # Lista de preguntas sin respuesta
+        for i, row in df_preguntas.iterrows():
+            pregunta_id = row['item']
+            # Si la respuesta está vacía
+            if respuestas.get(f'AV{pregunta_id}', '') == '':
+                preguntas_faltantes.append(pregunta_id)
+                # Cambiar el borde a rojo grueso
+                bordes[pregunta_id] = '3px solid red'
+
+        # Si alguna pregunta falta, mostrar un mensaje de advertencia
         if preguntas_faltantes:
             st.error(f"Por favor, responde las siguientes preguntas: {
                      ', '.join([f'Pregunta {i+1}' for i in preguntas_faltantes])}")
@@ -140,6 +148,13 @@ def mostrar_encuesta():
             st.balloons()
             st.success(
                 "Gracias por completar la encuesta. ¡Tu respuesta ha sido registrada!")
+
+        # Mostrar los recuadros actualizados con borde rojo para las preguntas sin respuesta
+        for i, row in df_preguntas.iterrows():
+            pregunta_id = row['item']
+            st.markdown(f"**Pregunta {i+1}:**")
+            st.markdown(f'<div style="border: {bordes[pregunta_id]}; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
+                        row["pregunta"]}</div>', unsafe_allow_html=True)
 
 
 # Llamar la función para mostrar la encuesta
