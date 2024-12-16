@@ -89,21 +89,20 @@ def mostrar_encuesta():
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = row['posibles respuestas'].split(',')
+        escala = ['No seleccionar'] + row['posibles respuestas'].split(',')
 
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
-        # Establecer `index=-1` para no tener ninguna opción seleccionada por defecto
-        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}', index=-1)
+        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
         respuestas[f'AV{pregunta_id}'] = respuesta
 
     # Botón para enviar las respuestas
     if st.button("Enviar"):
         # Validar que todas las preguntas hayan sido respondidas
-        preguntas_faltantes = [f"Pregunta {
-            i+1}" for i, row in df_preguntas.iterrows() if not respuestas.get(f'AV{row["item"]}', None)]
+        preguntas_faltantes = [f"Pregunta {i+1}" for i, row in df_preguntas.iterrows(
+        ) if respuestas.get(f'AV{row["item"]}', '') == 'No seleccionar']
 
         if preguntas_faltantes:
             st.error(f"Por favor, responde las siguientes preguntas: {
