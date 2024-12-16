@@ -149,6 +149,10 @@ def mostrar_encuesta():
             st.success(
                 "Gracias por completar la encuesta. ¡Tu respuesta ha sido registrada!")
 
+            # Bloquear las preguntas después de enviar
+            st.write(
+                "¡Gracias por participar! La encuesta ha sido enviada exitosamente.")
+
         # Mostrar los recuadros actualizados con borde rojo para las preguntas sin respuesta
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
