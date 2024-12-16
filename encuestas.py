@@ -91,12 +91,16 @@ def mostrar_encuesta():
         pregunta_texto = row['pregunta']
         escala = row['posibles respuestas'].split(',')
 
+        # Añadir la opción vacía al inicio de las opciones de respuesta
+        escala = ['Seleccione una opción'] + escala
+
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
         respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
-        respuestas[f'AV{pregunta_id}'] = respuesta
+        respuestas[f'AV{
+            pregunta_id}'] = respuesta if respuesta != 'Seleccione una opción' else None
 
     # Botón para enviar las respuestas
     if st.button("Enviar"):
@@ -104,16 +108,4 @@ def mostrar_encuesta():
         preguntas_faltantes = [f"Pregunta {
             i+1}" for i, row in df_preguntas.iterrows() if not respuestas.get(f'AV{row["item"]}', None)]
 
-        if preguntas_faltantes:
-            st.error(f"Por favor, responde las siguientes preguntas: {
-                     ', '.join(preguntas_faltantes)}")
-        else:
-            guardar_respuestas(respuestas)
-            st.balloons()
-            st.success(
-                "Gracias por completar la encuesta. ¡Tu respuesta ha sido registrada!")
-
-
-# Llamar la función para mostrar la encuesta
-if __name__ == '__main__':
-    mostrar_encuesta()
+        if pregunta
