@@ -91,30 +91,37 @@ def mostrar_encuesta():
     # Mostrar las preguntas numeradas y enmarcadas
     st.header("Preguntas de la Encuesta")
 
+    preguntas_faltantes = []
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = ['1: Totalmente en desacuerdo', '2: En desacuerdo',
-                  '3: Neutral', '4: De acuerdo', '5: Totalmente de acuerdo']
+        escala = ['Totalmente en desacuerdo', 'En desacuerdo',
+                  'Neutral', 'De acuerdo', 'Totalmente de acuerdo']
 
         st.markdown(f"**Pregunta {i+1}:**")
-        st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
-                    pregunta_texto}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
+                pregunta_texto}</div>',
+            unsafe_allow_html=True,
+        )
 
-        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
-        if respuesta != 'No seleccionar':
-            respuestas[f'AV{pregunta_id}'] = respuesta.split(
-                ':')[0]  # Extraer solo el número
+        # El valor por defecto será None, obligando al usuario a seleccionar algo
+        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}', index=None)
+        respuestas[f'AV{pregunta_id}'] = respuesta
+
+        # Validar si la respuesta está vacía
+        if respuesta is None:
+            preguntas_faltantes.append(f"Pregunta {i+1}")
 
     # Botón para enviar las respuestas
     if st.button("Enviar"):
-        preguntas_faltantes = [f"Pregunta {
-            i+1}" for i, row in df_preguntas.iterrows() if not respuestas.get(f'AV{row["item"]}', None)]
-
         if preguntas_faltantes:
-            st.error(f"Por favor, responde las siguientes preguntas: {
-                     ', '.join(preguntas_faltantes)}")
+            st.error(
+                f"Por favor, responde las siguientes preguntas antes de enviar: {
+                    ', '.join(preguntas_faltantes)}"
+            )
         else:
+            # Validar que todas las respuestas sean válidas
             guardar_respuestas(respuestas)
             st.balloons()
             st.success(
