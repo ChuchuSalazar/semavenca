@@ -12,10 +12,8 @@ FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
 # Inicializar Firebase, pero solo si no se ha inicializado previamente
 try:
-    # Intentamos obtener la app predeterminada
     app = get_app()
 except ValueError as e:
-    # Si no existe una app inicializada, la inicializamos
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
     app = initialize_app(cred)
 
@@ -100,6 +98,8 @@ def mostrar_encuesta():
     # Mostrar las preguntas numeradas y enmarcadas
     st.header("Preguntas de la Encuesta")
 
+    preguntas_faltantes = []  # Lista para preguntas no respondidas
+
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
@@ -108,13 +108,22 @@ def mostrar_encuesta():
             ',')  # Dividir las respuestas por coma
 
         # Crear una lista de opciones basadas en la escala
-        opciones = ['No seleccionado'] + \
-            posibles_respuestas[:escala]  # Añadir 'No seleccionado'
+        # Sin la opción de "No responder"
+        opciones = posibles_respuestas[:escala]
 
-        # Mostrar la pregunta
+        # Verificar si la pregunta ha sido respondida
+        if respuestas.get(f'AV{pregunta_id}', '') == '':
+            preguntas_faltantes.append(i)
+
+        # Cambiar el color del recuadro según la respuesta
+        border_color = 'red' if respuestas.get(
+            f'AV{pregunta_id}', '') == '' else 'blue'
+        border_style = '3px solid' if border_color == 'red' else '2px solid'
+
+        # Mostrar la pregunta con el color del borde
         st.markdown(f"**Pregunta {i+1}:**")
-        st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
-                    pregunta_texto}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="border: {border_style} {
+                    border_color}; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{pregunta_texto}</div>', unsafe_allow_html=True)
 
         # Mostrar las opciones para cada pregunta
         respuesta = st.radio(f"Respuesta:", opciones, key=f'AV{pregunta_id}')
@@ -123,12 +132,9 @@ def mostrar_encuesta():
     # Botón para enviar las respuestas
     if st.button("Enviar"):
         # Validar que todas las preguntas hayan sido respondidas
-        preguntas_faltantes = [f"Pregunta {i+1}" for i, row in df_preguntas.iterrows(
-        ) if respuestas.get(f'AV{row["item"]}', None) == 'No seleccionado']
-
         if preguntas_faltantes:
             st.error(f"Por favor, responde las siguientes preguntas: {
-                     ', '.join(preguntas_faltantes)}")
+                     ', '.join([f'Pregunta {i+1}' for i in preguntas_faltantes])}")
         else:
             guardar_respuestas(respuestas)
             st.balloons()
