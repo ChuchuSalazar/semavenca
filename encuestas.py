@@ -12,10 +12,8 @@ FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
 # Inicializar Firebase solo si no está inicializado
 try:
-    # Intenta obtener la app predeterminada
     app = get_app()
 except ValueError:
-    # Si no existe, inicializa la app
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
     app = initialize_app(cred)
 
@@ -30,9 +28,6 @@ def generar_id():
 
 # Cargar las preguntas del archivo de Excel
 df_preguntas = pd.read_excel('preguntas.xlsx')
-
-# Imprimir las primeras filas del DataFrame para depuración
-print(df_preguntas.head())
 
 # Función para guardar las respuestas en Firebase
 
@@ -53,10 +48,8 @@ def guardar_respuestas(respuestas):
     }
 
     # Añadir las respuestas de las preguntas
-    for i, row in df_preguntas.iterrows():
-        pregunta_id = row['ITEM']
-        respuesta = respuestas.get(f'AV{pregunta_id}', '')
-        data[f'AV{pregunta_id}'] = respuesta
+    for i, pregunta_id in enumerate(df_preguntas['item']):
+        data[f'AV{i+1}'] = respuestas.get(f'AV{pregunta_id}', '')
 
     # Guardar en Firebase
     db.collection('respuestas').document(str(id_encuesta)).set(data)
@@ -73,16 +66,17 @@ def mostrar_encuesta():
 
     # Mostrar los datos demográficos en forma horizontal
     st.header("Información General")
-    sexo = st.radio("Sexo:", ['M - Masculino', 'F - Femenino',
-                    'O - Otro'], key='sexo', horizontal=True)
+
+    sexo = st.radio("Sexo:", ['M - Masculino',
+                    'F - Femenino', 'O - Otro'], key='sexo')
     respuestas['sexo'] = sexo.split()[0]
 
     rango_edad = st.radio("Rango de edad:", [
-                          '1 - 18-25', '2 - 26-35', '3 - 36-45', '4 - 46-60', '5 - Más de 60'], key='rango_edad', horizontal=True)
+                          '1 - 18-25', '2 - 26-35', '3 - 36-45', '4 - 46-60', '5 - Más de 60'], key='rango_edad')
     respuestas['rango_edad'] = rango_edad.split()[0]
 
     rango_ingreso = st.radio("Rango de ingresos (US$):", [
-                             '1 - 0-300', '2 - 301-700', '3 - 701-1100', '4 - 1101-1500', '5 - 1501-3000', '6 - Más de 3000'], key='rango_ingreso', horizontal=True)
+                             '1 - 0-300', '2 - 301-700', '3 - 701-1100', '4 - 1101-1500', '5 - 1501-3000', '6 - Más de 3000'], key='rango_ingreso')
     respuestas['rango_ingreso'] = rango_ingreso.split()[0]
 
     ciudad = st.selectbox("Ciudad:", ['1 - Ciudad A', '2 - Ciudad B',
@@ -90,54 +84,43 @@ def mostrar_encuesta():
     respuestas['ciudad'] = ciudad.split()[0]
 
     nivel_educativo = st.radio("Nivel educativo:", [
-                               '1 - Primaria', '2 - Secundaria', '3 - Universitario', '4 - Postgrado'], key='nivel_educativo', horizontal=True)
+                               '1 - Primaria', '2 - Secundaria', '3 - Universitario', '4 - Postgrado'], key='nivel_educativo')
     respuestas['nivel_educativo'] = nivel_educativo.split()[0]
 
-    # Mostrar las preguntas numeradas y enmarcadas
+    # Mostrar las preguntas numeradas y en formato vertical
     st.header("Preguntas de la Encuesta")
 
     for i, row in df_preguntas.iterrows():
-        pregunta_id = row['ITEM']
-        pregunta_texto = row['PREGUNTA']
-        escala = row['ESCALA']  # Número de opciones en la escala
-        # Usar .get() para evitar errores
-        posibles_respuestas = row.get('POSIBLES_RESPUESTAS', '')
+        pregunta_id = row['item']
+        pregunta_texto = row['pregunta']
+        escala = int(row['escala'])
+        posibles_respuestas = row['posibles_respuestas'].split(',')
 
-        if posibles_respuestas:
-            posibles_respuestas = posibles_respuestas.split(
-                ';')  # Dividir las opciones por punto y coma
-        else:
-            posibles_respuestas = []  # Si no hay respuestas posibles, asignar una lista vacía
-
-        # Mostrar la pregunta
+        # Presentar las preguntas en forma de radio buttons
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
                     pregunta_texto}</div>', unsafe_allow_html=True)
 
-        # Mostrar las opciones de respuesta dependiendo de la escala
         if escala == 5:
-            respuesta = st.radio("Seleccione una opción:",
-                                 posibles_respuestas, key=f'AV{pregunta_id}')
-        elif escala == 2:
-            respuesta = st.radio("Seleccione una opción:",
-                                 posibles_respuestas, key=f'AV{pregunta_id}')
-        elif escala == 3:
-            respuesta = st.radio("Seleccione una opción:",
-                                 posibles_respuestas, key=f'AV{pregunta_id}')
+            opciones = ['1: Totalmente en desacuerdo', '2: En desacuerdo',
+                        '3: Neutral', '4: De acuerdo', '5: Totalmente de acuerdo']
         elif escala == 4:
-            respuesta = st.radio("Seleccione una opción:",
-                                 posibles_respuestas, key=f'AV{pregunta_id}')
-        else:
-            respuesta = st.radio("Seleccione una opción:",
-                                 posibles_respuestas, key=f'AV{pregunta_id}')
+            opciones = ['1: Muy en desacuerdo', '2: En desacuerdo',
+                        '3: De acuerdo', '4: Muy de acuerdo']
+        elif escala == 3:
+            opciones = ['1: No de acuerdo', '2: Neutral', '3: De acuerdo']
+        elif escala == 2:
+            opciones = ['1: No', '2: Sí']
 
+        # Mostrar las opciones en vertical
+        respuesta = st.radio(f"", opciones, key=f'AV{pregunta_id}')
         respuestas[f'AV{pregunta_id}'] = respuesta
 
     # Botón para enviar las respuestas
     if st.button("Enviar"):
         # Validar que todas las preguntas hayan sido respondidas
         preguntas_faltantes = [f"Pregunta {
-            i+1}" for i, row in df_preguntas.iterrows() if respuestas.get(f'AV{row["ITEM"]}', '') == '']
+            i+1}" for i, row in df_preguntas.iterrows() if respuestas.get(f'AV{row["item"]}', '') == '']
 
         if preguntas_faltantes:
             st.error(f"Por favor, responde las siguientes preguntas: {
