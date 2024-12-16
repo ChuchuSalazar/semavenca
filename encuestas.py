@@ -69,16 +69,24 @@ def mostrar_encuesta():
     }
 
     for pregunta, opciones in datos_demograficos.items():
-        respuesta = st.selectbox(
-            f"**{pregunta}**",
-            ['Seleccione una opción'] + opciones,
-            index=0,
-            key=f"demografico_{pregunta}"
-        )
-        if respuesta == 'Seleccione una opción':
-            respuestas[pregunta] = None
+        if pregunta == "Ciudad":
+            respuesta = st.selectbox(
+                f"**{pregunta}**",
+                ['Seleccione una opción'] + opciones,
+                index=0,
+                key=f"demografico_{pregunta}"
+            )
+            if respuesta == 'Seleccione una opción':
+                respuestas[pregunta] = None
+            else:
+                respuestas[pregunta] = respuesta
         else:
-            respuestas[pregunta] = respuesta
+            respuesta = st.multiselect(
+                f"**{pregunta}**", opciones, key=f"demografico_{pregunta}")
+            if len(respuesta) == 0:
+                respuestas[pregunta] = None
+            else:
+                respuestas[pregunta] = ', '.join(respuesta)
 
     # Preguntas principales
     st.header("Preguntas de la Encuesta")
@@ -88,10 +96,10 @@ def mostrar_encuesta():
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Estilo dinámico de borde (inicialmente azul)
+        # Estilo dinámico del borde (azul o rojo si faltante)
         estilo_borde = "2px solid blue"
-        if st.session_state.get(f"respuesta_{pregunta_id}", None) is None:
-            estilo_borde = "2px solid blue"
+        if st.session_state.get(f"respuesta_{pregunta_id}_faltante", False):
+            estilo_borde = "3px solid red"
 
         # Pregunta
         st.markdown(
@@ -121,32 +129,18 @@ def mostrar_encuesta():
         for key, value in respuestas.items():
             if value is None:
                 preguntas_faltantes.append(key)
+                st.session_state[f"{key}_faltante"] = True
+            else:
+                st.session_state[f"{key}_faltante"] = False
 
-        # Cambiar estilo si hay faltantes
-        for i, row in df_preguntas.iterrows():
-            pregunta_id = row['item']
-            if pregunta_id in preguntas_faltantes:
-                st.session_state[f"respuesta_{
-                    pregunta_id}_borde"] = "3px solid red"
-
-        # Ventana emergente simulada si hay preguntas faltantes
+        # Ventana emergente si hay preguntas faltantes
         if preguntas_faltantes:
-            faltantes_texto = ", ".join([str(f) for f in preguntas_faltantes])
             st.markdown(
                 f"""
-                <div style="
-                    position: fixed; top: 30%; left: 20%; right: 20%; z-index: 9999;
-                    background-color: white; padding: 20px; text-align: center;
-                    border: 3px solid red; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.3);
-                    border-radius: 10px;">
-                    <h4 style="color: red;">❗ Preguntas Sin Responder</h4>
-                    <p>Por favor, responda las siguientes preguntas: <b>{faltantes_texto}</b></p>
-                    <button onclick="window.location.reload()"
-                        style="background-color: #007bff; color: white; padding: 10px 20px;
-                        border: none; border-radius: 5px; cursor: pointer;">
-                        Aceptar
-                    </button>
-                </div>
+                <script>
+                    alert(
+                        "Por favor, responda las siguientes preguntas: {', '.join([str(f) for f in preguntas_faltantes])}");
+                </script>
                 """,
                 unsafe_allow_html=True
             )
