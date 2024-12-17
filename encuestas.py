@@ -65,21 +65,21 @@ def mostrar_encuesta():
     # Sección de datos demográficos
     st.header("Datos Demográficos")
 
-    # Preguntas demográficas con checklist
-    sexo = st.multiselect(
-        "Sexo:", ["Masculino", "Femenino", "Otro", "Prefiero no decirlo"])
+    # Preguntas demográficas con selección única (radio buttons)
+    sexo = st.radio("Sexo:", ["Masculino", "Femenino",
+                    "Otro", "Prefiero no decirlo"])
     ciudad = st.text_input("Ciudad:")
 
     # Alineación horizontal para rango de edad y rango de ingreso
     col1, col2 = st.columns(2)
     with col1:
-        rango_edad = st.multiselect(
+        rango_edad = st.radio(
             "Rango de Edad:", ["18-24", "25-34", "35-44", "45-54", "55+"])
     with col2:
-        rango_ingreso = st.multiselect("Rango de Ingreso:", [
-                                       "Menos de $10,000", "$10,000 - $30,000", "$30,000 - $50,000", "Más de $50,000"])
+        rango_ingreso = st.radio("Rango de Ingreso:", [
+                                 "Menos de $10,000", "$10,000 - $30,000", "$30,000 - $50,000", "Más de $50,000"])
 
-    nivel_educativo = st.multiselect(
+    nivel_educativo = st.radio(
         "Nivel Educativo:", ["Secundaria", "Bachillerato", "Licenciatura", "Posgrado"])
 
     # Guardar respuestas demográficas en el diccionario
