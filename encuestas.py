@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app, get_app
+from firebase_admin import credentials, initialize_app, db, get_app
 import os
 from dotenv import load_dotenv
 
@@ -15,10 +15,13 @@ try:
     app = get_app()
 except ValueError:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    initialize_app(cred)
+    initialize_app(cred, {
+        # Asegúrate de poner tu URL de Firebase Realtime Database
+        "databaseURL": "https://tu-proyecto.firebaseio.com"
+    })
 
-# Conectar a Firestore
-db = firestore.client()
+# Conectar a Realtime Database
+ref = db.reference("/respuestas")
 
 # Generar un ID único
 
@@ -34,7 +37,7 @@ url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/p
 df_preguntas = pd.read_excel(url_preguntas, header=None)
 df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
 
-# Guardar respuestas en Firebase
+# Guardar respuestas en Realtime Database
 
 
 def guardar_respuestas(respuestas):
@@ -45,7 +48,8 @@ def guardar_respuestas(respuestas):
     for key, value in respuestas.items():
         data[key] = value
 
-    db.collection('respuestas').document(id_encuesta).set(data)
+    # Subir datos a Realtime Database
+    ref.child(id_encuesta).set(data)
 
 # Mostrar encuesta
 
