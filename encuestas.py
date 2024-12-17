@@ -2,189 +2,134 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, initialize_app, db, get_app
-import os
-from dotenv import load_dotenv
+from openpyxl import load_workbook
+from openpyxl.styles import Font, Border, Side
+import streamlit.components.v1 as components
 
-# Cargar variables de entorno
-load_dotenv()
-FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
-
-# Inicializar Firebase, pero solo si no se ha inicializado previamente
-try:
-    app = get_app()
-except ValueError as e:
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred, {
-        # Asegúrate de usar la URL correcta de tu Realtime Database
-        "databaseURL": "https://encuestas-pca-default-rtdb.firebaseio.com/"
-    })
-
-# Conectar a Realtime Database
-ref = db.reference("/respuestas")
-
-# Generar un ID único
+# Función para generar un ID aleatorio
 
 
 def generar_id():
     return random.randint(100000, 999999)
 
 
-# URL del archivo de preguntas
-url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/preguntas.xlsx'
+# Cargar las preguntas del archivo de Excel
+df_preguntas = pd.read_excel('preguntas.xlsx')
 
-# Cargar preguntas
-df_preguntas = pd.read_excel(url_preguntas, header=None)
-# Asegurarse de tener la columna 'categoria'
-df_preguntas.columns = ['item', 'pregunta',
-                        'escala', 'posibles_respuestas', 'categoria']
-df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
-
-# Guardar respuestas en Realtime Database
+# Función para guardar las respuestas en el archivo Excel
 
 
 def guardar_respuestas(respuestas):
-    id_encuesta = f"ID_{generar_id()}"
+    id_encuesta = generar_id()
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    # Crear un diccionario de datos con la estructura adecuada
-    data = {'FECHA': fecha}
-    for categoria, respuestas_categoria in respuestas.items():
-        data[categoria] = respuestas_categoria
-    for key, value in respuestas.items():
-        data[key] = value
+    # Crear un diccionario con todas las respuestas y los datos adicionales
+    data = {
+        'ID': id_encuesta,
+        'FECHA': fecha,
+        'SEXO': respuestas.get('sexo', ''),
+        'RANGO_EDA': respuestas.get('rango_edad', ''),
+        'RANGO_INGRESO': respuestas.get('rango_ingreso', ''),
+        'CIUDAD': respuestas.get('ciudad', ''),
+        'NIVEL_PROF': respuestas.get('nivel_educativo', '')
+    }
 
-    # Guardar los datos en Realtime Database
-    ref.child(id_encuesta).set(data)
+    # Añadir las respuestas de las preguntas, usando los números correspondientes
+    for i, pregunta in enumerate(df_preguntas['item']):
+        # Guardar solo el número de la respuesta
+        data[f'AV{i+1}'] = respuestas.get(f'AV{i+1}', '')
 
-# Mostrar encuesta
+    # Intentamos guardar las respuestas en el archivo Excel
+    try:
+        # Intentar cargar el archivo existente
+        wb = load_workbook('respuestas.xlsx')
+        sheet = wb.active
+    except FileNotFoundError:
+        # Si el archivo no existe, creamos uno nuevo
+        wb = load_workbook('respuestas.xlsx')
+        sheet = wb.active
+        # Escribir encabezado
+        encabezado = ['ID', 'FECHA', 'SEXO', 'RANGO_EDA', 'RANGO_INGRESO',
+                      'CIUDAD', 'NIVEL_PROF'] + [f'AV{i+1}' for i in range(len(df_preguntas))]
+        sheet.append(encabezado)
+
+    # Añadir la nueva fila de respuestas
+    respuestas_fila = [data['ID'], data['FECHA'], data['SEXO'], data['RANGO_EDA'], data['RANGO_INGRESO'],
+                       data['CIUDAD'], data['NIVEL_PROF']] + [data[f'AV{i+1}'] for i in range(len(df_preguntas))]
+    sheet.append(respuestas_fila)
+
+    # Guardar los cambios
+    wb.save('respuestas.xlsx')
+
+# Función para mostrar la encuesta
 
 
 def mostrar_encuesta():
-    st.title("Encuesta de Hábitos de Ahorro")
-    st.write("Por favor, responda todas las preguntas obligatorias.")
-
-    # Diccionario para respuestas, categorizadas por AV, SQ, CM, DH
-    respuestas = {'AV': {}, 'SQ': {}, 'CM': {}, 'DH': {}}
-    # Diccionario para respuestas
     respuestas = {}
-    preguntas_faltantes = []  # Para rastrear preguntas sin responder
-    encuesta_enviada = False
-    # Sección de datos demográficos
-    st.header("Datos Demográficos")
-    # Preguntas demográficas con selección única (radio buttons)
-    sexo = st.radio("Sexo:", ["Masculino", "Femenino",
-                    "Otro", "Prefiero no decirlo"], key="sexo")
-    ciudad = st.selectbox("Ciudad:", [
-                          "Ciudad de México", "Guadalajara", "Monterrey", "Cancún", "Puebla"], key="ciudad")
-    # Alineación horizontal para rango de edad y rango de ingreso
-    col1, col2 = st.columns(2)
-    with col1:
-        rango_edad = st.radio("Rango de Edad:", [
-                              "18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad")
-    with col2:
-        rango_ingreso = st.radio("Rango de Ingreso:", [
-                                 "Menos de $10,000", "$10,000 - $30,000", "$30,000 - $50,000", "Más de $50,000"], key="rango_ingreso")
-    nivel_educativo = st.radio("Nivel Educativo:", [
-                               "Secundaria", "Bachillerato", "Licenciatura", "Posgrado"], key="nivel_educativo")
-    # Guardar respuestas demográficas en el diccionario
-    respuestas['SQ']['sexo'] = sexo
-    respuestas['SQ']['ciudad'] = ciudad
-    respuestas['SQ']['rango_edad'] = rango_edad
-    respuestas['SQ']['rango_ingreso'] = rango_ingreso
-    respuestas['SQ']['nivel_educativo'] = nivel_educativo
 
-    # Sección de preguntas
-    st.header("Preguntas de la Encuesta")
+    # Mostrar el logo de la universidad
+    st.image('logo_ucab.jpg', width=150,
+             caption="Universidad Católica Andrés Bello", use_container_width=True)
+
+    # Mostrar los datos demográficos en forma horizontal
+    sexo = st.radio("Sexo:", ['M - Masculino', 'F - Femenino',
+                    'O - Otro'], key='sexo', horizontal=True)
+    respuestas['sexo'] = sexo.split()[0]  # Guardamos solo el código (M, F, O)
+
+    # Rango de edad
+    rango_edad = st.radio("Rango de edad:", [
+                          '1 - 18-25', '2 - 26-35', '3 - 36-45', '4 - 46-60', '5 - Más de 60'], key='rango_edad', horizontal=True)
+    # Guardamos solo el número del rango
+    respuestas['rango_edad'] = rango_edad.split()[0]
+
+    # Rango de ingresos
+    rango_ingreso = st.radio("Rango de ingresos (US$):", [
+                             '1 - 0-300', '2 - 301-700', '3 - 701-1100', '4 - 1101-1500', '5 - 1501-3000', '6 - Más de 3000'], key='rango_ingreso', horizontal=True)
+    # Guardamos solo el número del rango
+    respuestas['rango_ingreso'] = rango_ingreso.split()[0]
+
+    # Ciudad como un combo list
+    ciudad = st.selectbox("Ciudad:", ['1 - Ciudad A', '2 - Ciudad B',
+                          '3 - Ciudad C', '4 - Ciudad D', '5 - Ciudad E'], key='ciudad')
+    # Guardamos solo el número de la ciudad
+    respuestas['ciudad'] = ciudad.split()[0]
+
+    # Nivel educativo
+    nivel_educativo = st.radio("Nivel educativo:", [
+                               '1 - Primaria', '2 - Secundaria', '3 - Universitario', '4 - Postgrado'], key='nivel_educativo', horizontal=True)
+    # Guardamos solo el número del nivel
+    respuestas['nivel_educativo'] = nivel_educativo.split()[0]
+
+    # Mostrar las preguntas numeradas y enmarcadas
     for i, row in df_preguntas.iterrows():
-        # Esto debe ser el código del sesgo (AV, SQ, CM, DH)
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = int(row['escala'])
-        opciones = row['posibles_respuestas'].split(',')[:escala]
-        categoria = row['categoria']  # Obtener la categoría de la pregunta
+        escala = row['posibles respuestas'].split(',')
 
-        # Estilo de borde inicial: azul
-        estilo_borde = f"2px solid blue"
-        # Inicializar el estilo de la pregunta
-        estilo_borde = f"2px solid blue"  # Borde azul por defecto
-        texto_bold = ""
+        # Numerar y enmarcar las preguntas, además de ajustar la tipografía
+        st.markdown(f"**Pregunta {i+1}:**")
+        st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
+                    pregunta_texto}</div>', unsafe_allow_html=True)
 
-        # Si la pregunta no ha sido respondida antes, añadir a respuestas
-        if pregunta_id not in respuestas[categoria]:
-            respuestas[categoria][pregunta_id] = None
-        if pregunta_id not in respuestas:
-            respuestas[pregunta_id] = None
+        # Mostrar opciones de respuesta como texto, pero guardar solo el número
+        respuesta = st.radio(f"", escala, key=f'AV{pregunta_id}')
+        # Guardamos el índice numérico (1, 2, 3, ...)
+        respuestas[f'AV{pregunta_id}'] = escala.index(respuesta) + 1
 
-        # Validación dinámica: marcar las preguntas sin respuesta en rojo después de enviar
-        if encuesta_enviada and respuestas[categoria].get(pregunta_id) is None:
-            # Validación dinámica: marcar las preguntas sin respuesta
-            if st.session_state.get(f"respuesta_{pregunta_id}", None) is None and pregunta_id in preguntas_faltantes:
-                estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
-            texto_bold = "font-weight: bold;"  # Texto en negrita
-
-        # Mostrar la pregunta con estilo
-        st.markdown(
-            f"""<div style="border: {estilo_borde}; padding: 10px; border-radius: 5px; {texto_bold}">
-                    {pregunta_texto}
-                </div>""",
-            unsafe_allow_html=True,
-        )
-
-        # Crear opciones de respuesta
-        respuesta = st.radio(
-            f"Seleccione una opción para la Pregunta {i+1}:",
-            opciones,
-            index=None,  # No hay selección por defecto
-            key=f"respuesta_{pregunta_id}",
-        )
-        respuestas[categoria][pregunta_id] = respuesta
-        respuestas[pregunta_id] = respuesta
-
-    # Ventana emergente para advertir sobre preguntas no respondidas
-    if not encuesta_enviada and any(respuesta is None for respuesta in respuestas['AV'].values()) or any(respuesta is None for respuesta in respuestas['SQ'].values()) or any(respuesta is None for respuesta in respuestas['CM'].values()) or any(respuesta is None for respuesta in respuestas['DH'].values()):
-        st.warning(
-            "Aún tienes preguntas sin responder. Por favor, responde todas las preguntas antes de enviar.")
-    # Botón para enviar
-    if st.button("Enviar", key="enviar_btn"):
-        preguntas_faltantes.clear()
-
-    # Botón para enviar la encuesta
-    if st.button("Enviar", key="boton_enviar") and not encuesta_enviada:
-        # Validar respuestas
-        preguntas_faltantes.clear()
-        for categoria in respuestas:
-            for pregunta_id, respuesta in respuestas[categoria].items():
-                if respuesta is None:
-                    preguntas_faltantes.append((categoria, pregunta_id))
-        for i, row in df_preguntas.iterrows():
-            pregunta_id = row['item']
-            if respuestas[pregunta_id] is None:
-                preguntas_faltantes.append((i + 1, pregunta_id))
-
-        # Si hay preguntas faltantes, mostrar advertencia
-        # Si hay preguntas faltantes, mostrar advertencias
-        if preguntas_faltantes:
-            st.error("Por favor, responda las siguientes preguntas:")
-            for categoria, pregunta_id in preguntas_faltantes:
-                st.write(f"❗ Pregunta {pregunta_id}")
-            for num_pregunta, _ in preguntas_faltantes:
-                st.write(f"❗ Pregunta {num_pregunta}")
-        else:
-            # Guardar las respuestas en Realtime Database
+    # Botón para enviar las respuestas
+    if st.button("Enviar"):
+        # Validar que todas las preguntas hayan sido respondidas
+        if all(respuestas.values()):
             guardar_respuestas(respuestas)
-            encuesta_enviada = True
-            st.success("¡Gracias por completar la encuesta!")
-            st.balloons()
-
-            # Bloquear preguntas después del envío
-            st.write("La encuesta ha sido enviada exitosamente.")
-            st.button("Enviar", key="boton_enviado", disabled=True)
-            # Desactivar el botón de enviar
-            st.session_state["enviar_btn"] = True
-            st.stop()
+            # Mostrar el mensaje de agradecimiento con confeti
+            st.balloons()  # Este es el efecto de confeti
+            st.success(
+                "Gracias por completar la encuesta. ¡Tu respuesta ha sido registrada!")
+            st.stop()  # Detener la ejecución para evitar que la encuesta se siga mostrando
+        else:
+            st.error("Por favor, responde todas las preguntas.")
 
 
-# Ejecutar la encuesta
+# Llamar la función para mostrar la encuesta
 if __name__ == '__main__':
     mostrar_encuesta()
