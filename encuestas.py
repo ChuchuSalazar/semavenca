@@ -149,15 +149,15 @@ def mostrar_encuesta():
 
     # Ventana emergente para advertir sobre preguntas no respondidas
     if not encuesta_enviada and any(respuesta is None for respuesta in respuestas.values()):
-    if not encuesta_enviada and any(respuesta is None for respuesta in respuestas['AV'].values()) or any(respuesta is None for respuesta in respuestas['SQ'].values()) or any(respuesta is None for respuesta in respuestas['CM'].values()) or any(respuesta is None for respuesta in respuestas['DH'].values()):
-        st.warning(
-            "Aún tienes preguntas sin responder. Por favor, responde todas las preguntas antes de enviar.")
+        if not encuesta_enviada and any(respuesta is None for respuesta in respuestas['AV'].values()) or any(respuesta is None for respuesta in respuestas['SQ'].values()) or any(respuesta is None for respuesta in respuestas['CM'].values()) or any(respuesta is None for respuesta in respuestas['DH'].values()):
+            st.warning(
+                "Aún tienes preguntas sin responder. Por favor, responde todas las preguntas antes de enviar.")
 
     # Botón para enviar la encuesta
     if st.button("Enviar") and not encuesta_enviada:
-    if st.button("Enviar", key="boton_enviar") and not encuesta_enviada:
-        # Validar respuestas
-        preguntas_faltantes.clear()
+        if st.button("Enviar", key="boton_enviar") and not encuesta_enviada:
+            # Validar respuestas
+            preguntas_faltantes.clear()
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
             if respuestas[pregunta_id] is None:
