@@ -61,26 +61,28 @@ def mostrar_encuesta():
     # Diccionario para respuestas
     respuestas = {}
     preguntas_faltantes = []  # Para rastrear preguntas sin responder
+    encuesta_enviada = False
 
     # Sección de datos demográficos
     st.header("Datos Demográficos")
 
     # Preguntas demográficas con selección única (radio buttons)
     sexo = st.radio("Sexo:", ["Masculino", "Femenino",
-                    "Otro", "Prefiero no decirlo"])
-    ciudad = st.text_input("Ciudad:")
+                    "Otro", "Prefiero no decirlo"], key="sexo")
+    ciudad = st.selectbox("Ciudad:", [
+                          "Ciudad de México", "Guadalajara", "Monterrey", "Cancún", "Puebla"], key="ciudad")
 
     # Alineación horizontal para rango de edad y rango de ingreso
     col1, col2 = st.columns(2)
     with col1:
-        rango_edad = st.radio(
-            "Rango de Edad:", ["18-24", "25-34", "35-44", "45-54", "55+"])
+        rango_edad = st.radio("Rango de Edad:", [
+                              "18-24", "25-34", "35-44", "45-54", "55+"], key="rango_edad")
     with col2:
         rango_ingreso = st.radio("Rango de Ingreso:", [
-                                 "Menos de $10,000", "$10,000 - $30,000", "$30,000 - $50,000", "Más de $50,000"])
+                                 "Menos de $10,000", "$10,000 - $30,000", "$30,000 - $50,000", "Más de $50,000"], key="rango_ingreso")
 
-    nivel_educativo = st.radio(
-        "Nivel Educativo:", ["Secundaria", "Bachillerato", "Licenciatura", "Posgrado"])
+    nivel_educativo = st.radio("Nivel Educativo:", [
+                               "Secundaria", "Bachillerato", "Licenciatura", "Posgrado"], key="nivel_educativo")
 
     # Guardar respuestas demográficas en el diccionario
     respuestas['sexo'] = sexo
@@ -97,16 +99,16 @@ def mostrar_encuesta():
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Inicializar el estilo de la pregunta
-        estilo_borde = f"2px solid blue"  # Borde azul por defecto
+        # Estilo de borde inicial: azul
+        estilo_borde = f"2px solid blue"
         texto_bold = ""
 
         # Si la pregunta no ha sido respondida antes, añadir a respuestas
         if pregunta_id not in respuestas:
             respuestas[pregunta_id] = None
 
-        # Validación dinámica: marcar las preguntas sin respuesta
-        if st.session_state.get(f"respuesta_{pregunta_id}", None) is None and pregunta_id in preguntas_faltantes:
+        # Validación dinámica: marcar las preguntas sin respuesta en rojo después de enviar
+        if encuesta_enviada and respuestas.get(pregunta_id) is None:
             estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
             texto_bold = "font-weight: bold;"  # Texto en negrita
 
@@ -127,17 +129,21 @@ def mostrar_encuesta():
         )
         respuestas[pregunta_id] = respuesta
 
-    # Botón para enviar
-    if st.button("Enviar"):
-        preguntas_faltantes.clear()
+    # Ventana emergente para advertir sobre preguntas no respondidas
+    if not encuesta_enviada and any(respuesta is None for respuesta in respuestas.values()):
+        st.warning(
+            "Aún tienes preguntas sin responder. Por favor, responde todas las preguntas antes de enviar.")
 
+    # Botón para enviar la encuesta
+    if st.button("Enviar") and not encuesta_enviada:
         # Validar respuestas
+        preguntas_faltantes.clear()
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
             if respuestas[pregunta_id] is None:
                 preguntas_faltantes.append((i + 1, pregunta_id))
 
-        # Si hay preguntas faltantes, mostrar advertencias
+        # Si hay preguntas faltantes, mostrar advertencia
         if preguntas_faltantes:
             st.error("Por favor, responda las siguientes preguntas:")
             for num_pregunta, _ in preguntas_faltantes:
@@ -145,11 +151,13 @@ def mostrar_encuesta():
         else:
             # Guardar las respuestas en Realtime Database
             guardar_respuestas(respuestas)
+            encuesta_enviada = True
             st.success("¡Gracias por completar la encuesta!")
             st.balloons()
 
             # Bloquear preguntas después del envío
             st.write("La encuesta ha sido enviada exitosamente.")
+            st.button("Enviar", disabled=True)
             st.stop()
 
 
