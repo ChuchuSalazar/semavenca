@@ -112,8 +112,8 @@ def mostrar_encuesta():
         # Validación dinámica: marcar las preguntas sin respuesta en rojo
         if not encuesta_enviada and respuestas.get(pregunta_id) is None:
             # Validación dinámica: marcar las preguntas sin respuesta en rojo después de enviar
-        if encuesta_enviada and respuestas.get(pregunta_id) is None:
-            estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
+            if encuesta_enviada and respuestas.get(pregunta_id) is None:
+                estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
             texto_bold = "font-weight: bold;"  # Texto en negrita
 
         # Mostrar la pregunta con estilo
