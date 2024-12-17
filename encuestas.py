@@ -44,6 +44,7 @@ def guardar_respuestas(respuestas):
         # Intentar cargar el archivo existente
         wb = load_workbook('respuestas.xlsx')
         sheet = wb.active
+
     except FileNotFoundError:
         # Si el archivo no existe, creamos uno nuevo
         wb = load_workbook('respuestas.xlsx')
@@ -66,10 +67,6 @@ def guardar_respuestas(respuestas):
 
 def mostrar_encuesta():
     respuestas = {}
-
-    # Mostrar el logo de la universidad
-    st.image('logo_ucab.jpg', width=150,
-             caption="Universidad Católica Andrés Bello", use_container_width=True)
 
     # Mostrar los datos demográficos en forma horizontal
     sexo = st.radio("Sexo:", ['M - Masculino', 'F - Femenino',
