@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import random
 import datetime
-from firebase_admin import credentials, firestore, initialize_app, get_app
+from firebase_admin import credentials, firestore, initialize_app
 import os
 from dotenv import load_dotenv
 
@@ -10,16 +10,10 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase solo si no está inicializado
-try:
-    # Intenta obtener la app predeterminada
-    app = get_app()
-except ValueError:
-    # Si no existe, inicializa la app
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
-
-db = firestore.client(app)
+# Inicializar Firebase
+cred = credentials.Certificate(FIREBASE_CREDENTIALS)
+initialize_app(cred)
+db = firestore.client()
 
 # Función para generar un ID aleatorio
 
@@ -35,12 +29,12 @@ df_preguntas = pd.read_excel('preguntas.xlsx')
 
 
 def guardar_respuestas(respuestas):
-    id_encuesta = generar_id()
+    # Asegurando un ID coherente con la estructura
+    id_encuesta = f"ID_{generar_id()}"
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # Crear un diccionario con todas las respuestas y los datos adicionales
     data = {
-        'ID': id_encuesta,
         'FECHA': fecha,
         'SEXO': respuestas.get('sexo', ''),
         'RANGO_EDA': respuestas.get('rango_edad', ''),
@@ -50,11 +44,12 @@ def guardar_respuestas(respuestas):
     }
 
     # Añadir las respuestas de las preguntas
-    for i, pregunta_id in enumerate(df_preguntas['item']):
-        data[f'AV{i+1}'] = respuestas.get(f'AV{pregunta_id}', '')
+    for i, row in df_preguntas.iterrows():
+        pregunta_id = row['item']
+        data[f'AV{pregunta_id}'] = respuestas.get(f'AV{pregunta_id}', '')
 
     # Guardar en Firebase
-    db.collection('respuestas').document(str(id_encuesta)).set(data)
+    db.collection('respuestas').document(id_encuesta).set(data)
 
 # Función para mostrar la encuesta
 
@@ -95,7 +90,7 @@ def mostrar_encuesta():
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
         pregunta_texto = row['pregunta']
-        escala = ['No seleccionar'] + row['posibles respuestas'].split(',')
+        escala = row['posibles respuestas'].split(',')
 
         st.markdown(f"**Pregunta {i+1}:**")
         st.markdown(f'<div style="border: 2px solid #add8e6; padding: 10px; border-radius: 5px; font-size: 16px; font-family: Arial, sans-serif;">{
@@ -107,8 +102,8 @@ def mostrar_encuesta():
     # Botón para enviar las respuestas
     if st.button("Enviar"):
         # Validar que todas las preguntas hayan sido respondidas
-        preguntas_faltantes = [f"Pregunta {i+1}" for i, row in df_preguntas.iterrows(
-        ) if respuestas.get(f'AV{row["item"]}', '') == 'No seleccionar']
+        preguntas_faltantes = [f"Pregunta {
+            i+1}" for i, row in df_preguntas.iterrows() if not respuestas.get(f'AV{row["item"]}', None)]
 
         if preguntas_faltantes:
             st.error(f"Por favor, responde las siguientes preguntas: {
