@@ -10,14 +10,14 @@ from dotenv import load_dotenv
 load_dotenv()
 FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
 
-# Inicializar Firebase solo una vez
+# Inicializar Firebase, pero solo si no se ha inicializado previamente
 try:
     app = get_app()
-except ValueError:
+except ValueError as e:
     cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    initialize_app(cred, {
-        # Asegúrate de poner tu URL de Firebase Realtime Database
-        "databaseURL": "https://tu-proyecto.firebaseio.com"
+    app = initialize_app(cred, {
+        # Asegúrate de usar la URL correcta de tu Realtime Database
+        "databaseURL": "https://encuestas-pca-default-rtdb.firebaseio.com/"
     })
 
 # Conectar a Realtime Database
@@ -48,7 +48,7 @@ def guardar_respuestas(respuestas):
     for key, value in respuestas.items():
         data[key] = value
 
-    # Subir datos a Realtime Database
+    # Guardar los datos en Realtime Database
     ref.child(id_encuesta).set(data)
 
 # Mostrar encuesta
@@ -56,43 +56,13 @@ def guardar_respuestas(respuestas):
 
 def mostrar_encuesta():
     st.title("Encuesta de Hábitos de Ahorro")
-    st.write("Por favor, complete todas las preguntas obligatorias.")
+    st.write("Por favor, responda todas las preguntas obligatorias.")
 
     # Diccionario para respuestas
     respuestas = {}
-    preguntas_faltantes = []
+    preguntas_faltantes = []  # Para rastrear preguntas sin responder
 
-    # Sección demográfica
-    st.header("Información Demográfica")
-    datos_demograficos = {
-        'Sexo': ['Masculino', 'Femenino', 'Otro'],
-        'Ciudad': ['Ciudad A', 'Ciudad B', 'Ciudad C'],
-        'Escala de Edad': ['18-25', '26-35', '36-50', '51+'],
-        'Escala de Ingresos': ['Bajo', 'Medio', 'Alto'],
-        'Nivel Profesional': ['Primaria', 'Secundaria', 'Universitario', 'Postgrado']
-    }
-
-    for pregunta, opciones in datos_demograficos.items():
-        if pregunta == "Ciudad":
-            respuesta = st.selectbox(
-                f"**{pregunta}**",
-                ['Seleccione una opción'] + opciones,
-                index=0,
-                key=f"demografico_{pregunta}"
-            )
-            if respuesta == 'Seleccione una opción':
-                respuestas[pregunta] = None
-            else:
-                respuestas[pregunta] = respuesta
-        else:
-            respuesta = st.multiselect(
-                f"**{pregunta}**", opciones, key=f"demografico_{pregunta}")
-            if len(respuesta) == 0:
-                respuestas[pregunta] = None
-            else:
-                respuestas[pregunta] = ', '.join(respuesta)
-
-    # Preguntas principales
+    # Sección de preguntas
     st.header("Preguntas de la Encuesta")
     for i, row in df_preguntas.iterrows():
         pregunta_id = row['item']
@@ -100,61 +70,62 @@ def mostrar_encuesta():
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
 
-        # Estilo dinámico del borde (azul o rojo si faltante)
-        estilo_borde = "2px solid blue"
-        if st.session_state.get(f"respuesta_{pregunta_id}_faltante", False):
-            estilo_borde = "3px solid red"
+        # Inicializar el estilo de la pregunta
+        estilo_borde = f"2px solid blue"  # Borde azul por defecto
+        texto_bold = ""
 
-        # Pregunta
+        # Si la pregunta no ha sido respondida antes, añadir a respuestas
+        if pregunta_id not in respuestas:
+            respuestas[pregunta_id] = None
+
+        # Validación dinámica: marcar las preguntas sin respuesta
+        if st.session_state.get(f"respuesta_{pregunta_id}", None) is None and pregunta_id in preguntas_faltantes:
+            estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
+            texto_bold = "font-weight: bold;"  # Texto en negrita
+
+        # Mostrar la pregunta con estilo
         st.markdown(
-            f"""
-            <div style="border: {estilo_borde}; padding: 10px; margin-bottom: 10px;
-                        border-radius: 5px; background-color: #f9f9f9;">
-                {pregunta_texto}
-            </div>
-            """,
-            unsafe_allow_html=True
+            f"""<div style="border: {estilo_borde}; padding: 10px; border-radius: 5px; {texto_bold}">
+                    {pregunta_texto}
+                </div>""",
+            unsafe_allow_html=True,
         )
 
-        # Opciones
+        # Crear opciones de respuesta
         respuesta = st.radio(
-            f"Pregunta {i+1}:",
+            f"Seleccione una opción para la Pregunta {i+1}:",
             opciones,
-            index=None,
-            key=f"respuesta_{pregunta_id}"
+            index=None,  # No hay selección por defecto
+            key=f"respuesta_{pregunta_id}",
         )
         respuestas[pregunta_id] = respuesta
 
-    # Botón de enviar
+    # Botón para enviar
     if st.button("Enviar"):
         preguntas_faltantes.clear()
 
-        # Validar preguntas no respondidas
-        for key, value in respuestas.items():
-            if value is None:
-                preguntas_faltantes.append(key)
-                st.session_state[f"{key}_faltante"] = True
-            else:
-                st.session_state[f"{key}_faltante"] = False
+        # Validar respuestas
+        for i, row in df_preguntas.iterrows():
+            pregunta_id = row['item']
+            if respuestas[pregunta_id] is None:
+                preguntas_faltantes.append((i + 1, pregunta_id))
 
-        # Ventana emergente si hay preguntas faltantes
+        # Si hay preguntas faltantes, mostrar advertencias
         if preguntas_faltantes:
-            st.markdown(
-                f"""
-                <script>
-                    alert(
-                        "Por favor, responda las siguientes preguntas: {', '.join([str(f) for f in preguntas_faltantes])}");
-                </script>
-                """,
-                unsafe_allow_html=True
-            )
+            st.error("Por favor, responda las siguientes preguntas:")
+            for num_pregunta, _ in preguntas_faltantes:
+                st.write(f"❗ Pregunta {num_pregunta}")
         else:
+            # Guardar las respuestas en Realtime Database
             guardar_respuestas(respuestas)
             st.success("¡Gracias por completar la encuesta!")
             st.balloons()
+
+            # Bloquear preguntas después del envío
+            st.write("La encuesta ha sido enviada exitosamente.")
             st.stop()
 
 
-# Ejecutar
+# Ejecutar la encuesta
 if __name__ == '__main__':
     mostrar_encuesta()
