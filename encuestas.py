@@ -36,6 +36,9 @@ url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/p
 # Cargar preguntas
 df_preguntas = pd.read_excel(url_preguntas, header=None)
 df_preguntas.columns = ['item', 'pregunta', 'escala', 'posibles_respuestas']
+# Asegurarse de tener la columna 'categoria'
+df_preguntas.columns = ['item', 'pregunta',
+                        'escala', 'posibles_respuestas', 'categoria']
 
 # Guardar respuestas en Realtime Database
 
@@ -44,9 +47,12 @@ def guardar_respuestas(respuestas):
     id_encuesta = f"ID_{generar_id()}"
     fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+    # Crear un diccionario de datos con la estructura adecuada
     data = {'FECHA': fecha}
     for key, value in respuestas.items():
         data[key] = value
+    for categoria, respuestas_categoria in respuestas.items():
+        data[categoria] = respuestas_categoria
 
     # Guardar los datos en Realtime Database
     ref.child(id_encuesta).set(data)
@@ -60,6 +66,8 @@ def mostrar_encuesta():
 
     # Diccionario para respuestas
     respuestas = {}
+    # Diccionario para respuestas, categorizadas por AV, SQ, CM, DH
+    respuestas = {'AV': {}, 'SQ': {}, 'CM': {}, 'DH': {}}
     preguntas_faltantes = []  # Para rastrear preguntas sin responder
     encuesta_enviada = False
 
@@ -90,6 +98,11 @@ def mostrar_encuesta():
     respuestas['rango_edad'] = rango_edad
     respuestas['rango_ingreso'] = rango_ingreso
     respuestas['nivel_educativo'] = nivel_educativo
+    respuestas['SQ']['sexo'] = sexo
+    respuestas['SQ']['ciudad'] = ciudad
+    respuestas['SQ']['rango_edad'] = rango_edad
+    respuestas['SQ']['rango_ingreso'] = rango_ingreso
+    respuestas['SQ']['nivel_educativo'] = nivel_educativo
 
     # Sección de preguntas
     st.header("Preguntas de la Encuesta")
@@ -98,9 +111,8 @@ def mostrar_encuesta():
         pregunta_texto = row['pregunta']
         escala = int(row['escala'])
         opciones = row['posibles_respuestas'].split(',')[:escala]
+        categoria = row['categoria']  # Obtener la categoría de la pregunta
 
-        # Estilo de borde
-        estilo_borde = f"2px solid blue"  # Borde azul por defecto
         # Estilo de borde inicial: azul
         estilo_borde = f"2px solid blue"
         texto_bold = ""
@@ -108,11 +120,12 @@ def mostrar_encuesta():
         # Si la pregunta no ha sido respondida antes, añadir a respuestas
         if pregunta_id not in respuestas:
             respuestas[pregunta_id] = None
+        if pregunta_id not in respuestas[categoria]:
+            respuestas[categoria][pregunta_id] = None
 
-        # Validación dinámica: marcar las preguntas sin respuesta en rojo
-        if not encuesta_enviada and respuestas.get(pregunta_id) is None:
-            # Validación dinámica: marcar las preguntas sin respuesta en rojo después de enviar
-            if encuesta_enviada and respuestas.get(pregunta_id) is None:
+        # Validación dinámica: marcar las preguntas sin respuesta en rojo después de enviar
+        if encuesta_enviada and respuestas.get(pregunta_id) is None:
+            if encuesta_enviada and respuestas[categoria].get(pregunta_id) is None:
                 estilo_borde = f"3px solid red"  # Borde rojo para preguntas no respondidas
             texto_bold = "font-weight: bold;"  # Texto en negrita
 
@@ -132,26 +145,35 @@ def mostrar_encuesta():
             key=f"respuesta_{pregunta_id}",
         )
         respuestas[pregunta_id] = respuesta
+        respuestas[categoria][pregunta_id] = respuesta
 
     # Ventana emergente para advertir sobre preguntas no respondidas
     if not encuesta_enviada and any(respuesta is None for respuesta in respuestas.values()):
+    if not encuesta_enviada and any(respuesta is None for respuesta in respuestas['AV'].values()) or any(respuesta is None for respuesta in respuestas['SQ'].values()) or any(respuesta is None for respuesta in respuestas['CM'].values()) or any(respuesta is None for respuesta in respuestas['DH'].values()):
         st.warning(
             "Aún tienes preguntas sin responder. Por favor, responde todas las preguntas antes de enviar.")
 
     # Botón para enviar la encuesta
     if st.button("Enviar") and not encuesta_enviada:
+    if st.button("Enviar", key="boton_enviar") and not encuesta_enviada:
         # Validar respuestas
         preguntas_faltantes.clear()
         for i, row in df_preguntas.iterrows():
             pregunta_id = row['item']
             if respuestas[pregunta_id] is None:
                 preguntas_faltantes.append((i + 1, pregunta_id))
+        for categoria in respuestas:
+            for pregunta_id, respuesta in respuestas[categoria].items():
+                if respuesta is None:
+                    preguntas_faltantes.append((categoria, pregunta_id))
 
         # Si hay preguntas faltantes, mostrar advertencia
         if preguntas_faltantes:
             st.error("Por favor, responda las siguientes preguntas:")
             for num_pregunta, _ in preguntas_faltantes:
                 st.write(f"❗ Pregunta {num_pregunta}")
+            for categoria, pregunta_id in preguntas_faltantes:
+                st.write(f"❗ Pregunta {pregunta_id}")
         else:
             # Guardar las respuestas en Realtime Database
             guardar_respuestas(respuestas)
@@ -162,6 +184,7 @@ def mostrar_encuesta():
             # Bloquear preguntas después del envío
             st.write("La encuesta ha sido enviada exitosamente.")
             st.button("Enviar", disabled=True)
+            st.button("Enviar", key="boton_enviado", disabled=True)
             st.stop()
 
 
