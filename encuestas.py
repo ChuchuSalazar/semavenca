@@ -62,6 +62,33 @@ def mostrar_encuesta():
     respuestas = {}
     preguntas_faltantes = []  # Para rastrear preguntas sin responder
 
+    # Sección de datos demográficos
+    st.header("Datos Demográficos")
+
+    # Preguntas demográficas con checklist
+    sexo = st.multiselect(
+        "Sexo:", ["Masculino", "Femenino", "Otro", "Prefiero no decirlo"])
+    ciudad = st.text_input("Ciudad:")
+
+    # Alineación horizontal para rango de edad y rango de ingreso
+    col1, col2 = st.columns(2)
+    with col1:
+        rango_edad = st.multiselect(
+            "Rango de Edad:", ["18-24", "25-34", "35-44", "45-54", "55+"])
+    with col2:
+        rango_ingreso = st.multiselect("Rango de Ingreso:", [
+                                       "Menos de $10,000", "$10,000 - $30,000", "$30,000 - $50,000", "Más de $50,000"])
+
+    nivel_educativo = st.multiselect(
+        "Nivel Educativo:", ["Secundaria", "Bachillerato", "Licenciatura", "Posgrado"])
+
+    # Guardar respuestas demográficas en el diccionario
+    respuestas['sexo'] = sexo
+    respuestas['ciudad'] = ciudad
+    respuestas['rango_edad'] = rango_edad
+    respuestas['rango_ingreso'] = rango_ingreso
+    respuestas['nivel_educativo'] = nivel_educativo
+
     # Sección de preguntas
     st.header("Preguntas de la Encuesta")
     for i, row in df_preguntas.iterrows():
