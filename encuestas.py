@@ -1,160 +1,183 @@
 import streamlit as st
 import pandas as pd
 import random
-import datetime
-from firebase_admin import credentials, firestore, initialize_app, get_app
-import os
-from dotenv import load_dotenv
+from datetime import datetime
 
-# Cargar variables de entorno
-load_dotenv()
-FIREBASE_CREDENTIALS = os.getenv("FIREBASE_CREDENTIALS")
-
-# Inicializar Firebase solo si no se ha inicializado previamente
-try:
-    app = get_app()
-except ValueError as e:
-    cred = credentials.Certificate(FIREBASE_CREDENTIALS)
-    app = initialize_app(cred)
-
-# Conectar a Firestore
-db = firestore.client()
-
-# Función para generar un ID único
+# Generar un ID aleatorio
 
 
 def generar_id():
     return random.randint(100000, 999999)
 
-
-# URL del archivo de preguntas
-url_preguntas = 'https://raw.githubusercontent.com/ChuchuSalazar/encuesta/main/preguntas.xlsx'
-
-# Función para cargar preguntas
+# Cargar preguntas desde Excel
 
 
-def cargar_preguntas(url):
+def cargar_preguntas():
     try:
-        # Leer encabezados desde la primera fila
-        df = pd.read_excel(url, header=0)
-        columnas_esperadas = ['item', 'pregunta',
-                              'escala', 'posibles_respuestas']
-        if not all(col in df.columns for col in columnas_esperadas):
-            st.error(
-                "El archivo no contiene las columnas esperadas: 'item', 'pregunta', 'escala', 'posibles_respuestas'")
-            st.stop()
+        # Leer el archivo Excel asegurando que la primera fila sea usada como encabezado
+        preguntas_df = pd.read_excel("preguntas.xlsx")
+        return preguntas_df
+    except FileNotFoundError:
+        st.error(
+            "Error: No se encontró el archivo preguntas.xlsx. Asegúrate de colocarlo en la misma carpeta.")
+        return None
 
-        df['escala'] = pd.to_numeric(df['escala'], errors='coerce')
-        df = df.dropna(subset=['escala'])
-        df['escala'] = df['escala'].astype(int)
-        return df
-    except Exception as e:
-        st.error(f"Error al cargar las preguntas: {e}")
-        st.stop()
-
-
-# Cargar preguntas desde el archivo
-df_preguntas = cargar_preguntas(url_preguntas)
-
-# Función para guardar respuestas en Firebase
-
-
-def guardar_respuestas(respuestas):
-    id_encuesta = f"ID_{generar_id()}"
-    fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    data = {'FECHA': fecha}
-    data.update(respuestas)
-    db.collection('respuestas').document(id_encuesta).set(data)
-
-# Función principal para mostrar la encuesta
+# Función principal
 
 
 def mostrar_encuesta():
-    st.title("Encuesta de Hábitos de Ahorro")
-    st.write("Por favor, responda todas las preguntas obligatorias.")
+    st.set_page_config(page_title="Encuesta UCAB", layout="wide")
 
-    # Diccionario para respuestas
-    respuestas = {}
+    # --- Encabezado ---
+    numero_control = generar_id()
+    fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Preguntas iniciales: Datos demográficos
-    st.header("Datos Demográficos")
-
-    # Distribuir Sexo y Rango de Edad horizontalmente
-    col1, col2 = st.columns(2)
-
+    col1, col2 = st.columns([8, 2])
     with col1:
-        respuestas['sexo'] = st.radio(
-            "Sexo", ["Masculino", "Femenino", "Otro"], index=None, horizontal=True)
-
+        st.title("Encuesta de Investigación - UCAB")
+        st.subheader(f"Fecha y hora: {fecha_hora}")
+        st.write(f"**Número de Control:** {numero_control}")
     with col2:
-        respuestas['rango_edad'] = st.radio(
-            "Rango de Edad", ["18-25", "26-35", "36-45", "46-60", "60+"], index=None, horizontal=True
-        )
+        # Actualizado para evitar la advertencia
+        st.image("logo_ucab.jpg", use_container_width=True)
 
-    # Pregunta de Rango de Ingresos
-    respuestas['rango_ingresos'] = st.radio(
-        "Rango de Ingresos Mensuales",
-        ["Menos de $500", "$500-$1000", "$1000-$2000", "Más de $2000"],
-        index=None
+    # --- CSS Personalizado ---
+    st.markdown("""
+        <style>
+            .marco-azul {
+                border: 2px solid #0056b3;
+                background-color: #e6f0ff;
+                padding: 20px;
+                border-radius: 10px;
+            }
+            .titulo {
+                color: #0056b3;
+                text-align: center;
+                font-size: 20px;
+                font-weight: bold;
+            }
+            .boton-grande label {
+                display: inline-block;
+                padding: 15px;
+                margin: 5px;
+                border: 2px solid #0056b3;
+                border-radius: 5px;
+                background-color: #f5f9ff;
+                color: #0056b3;
+                font-weight: bold;
+                text-align: center;
+                cursor: pointer;
+                width: 150px;
+            }
+            .radio label {
+                margin-right: 10px;
+            }
+            .boton-sexo {
+                display: flex;
+                justify-content: space-between;
+                gap: 10px;
+                align-items: center;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- Marco Azul Claro para Información General ---
+    st.markdown('<div class="marco-azul">', unsafe_allow_html=True)
+    st.markdown('<div class="titulo">Información General</div>',
+                unsafe_allow_html=True)
+
+    # --- Datos Demográficos ---
+    # Género
+    st.markdown("**Seleccione su género:**")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        sexo = st.button("🧑 Hombre", key="hombre")
+    with col2:
+        sexo = st.button("👩 Mujer", key="mujer")
+    with col3:
+        sexo = st.button("🌈 Otro", key="otro")
+
+    # Rango de Edad - Usar las opciones del código
+    st.markdown("**Seleccione su rango de edad:**")
+    rangos_edad = ["18-25", "26-35", "36-45", "46-55", "56+"]
+    rango_edad = st.radio("Edad:", options=rangos_edad, key="rango_edad")
+
+    # Rango de Salario - Usar las opciones del código
+    st.markdown("**Seleccione su rango de salario mensual (en USD):**")
+    rangos_salario = ["0-1000", "1001-5000", "5001-10000", "10001+"]
+    salario = st.radio("Salario:", options=rangos_salario, key="rango_salario")
+
+    # Nivel Educativo
+    st.markdown("**Seleccione su nivel educativo:**")
+    educacion = st.radio(
+        "Nivel educativo:",
+        options=["Primaria", "Secundaria", "Universitaria", "Posgrado"],
+        horizontal=True,
+        index=None,
+        label_visibility="collapsed"
     )
 
-    # Nivel de Educación y Ciudad (desplegables)
-    respuestas['nivel_educacion'] = st.selectbox(
-        "Nivel de Educación",
-        ["Seleccione una opción", "Primaria", "Secundaria",
-            "Pregrado", "Posgrado", "Doctorado"],
-        index=0
-    )
+    # Ciudad
+    st.markdown("**Ciudad de residencia:**")
+    ciudad = st.text_input("Ciudad:", "Caracas")
 
-    respuestas['ciudad'] = st.text_input(
-        "Ciudad de Residencia", placeholder="Ingrese su ciudad aquí")
+    st.markdown("</div>", unsafe_allow_html=True)  # Cerrar marco azul
 
-    # Validación de preguntas iniciales
-    if st.button("Continuar a la Encuesta"):
-        if None in respuestas.values() or respuestas['nivel_educacion'] == "Seleccione una opción" or respuestas['ciudad'].strip() == "":
-            st.error(
-                "Por favor, complete todos los datos demográficos antes de continuar.")
-            st.stop()
-        else:
-            st.success("¡Datos demográficos completados!")
-            # Marcar como completado
-            st.session_state['datos_completados'] = True
+    # --- Cargar preguntas ---
+    st.markdown("### Preguntas de la Encuesta")
+    preguntas_df = cargar_preguntas()
+    if preguntas_df is not None:
+        respuestas = {}
+        contador_respondidas = 0
 
-    # Continuar solo si los datos demográficos están completos
-    if 'datos_completados' in st.session_state and st.session_state['datos_completados']:
-        st.header("Preguntas de la Encuesta")
-        preguntas_faltantes = []  # Rastreo de preguntas sin respuesta
+        # Asegurarse de que las filas comienzan desde la segunda fila de datos (evitar usar la primera fila de encabezado)
+        for index, row in preguntas_df.iterrows():
+            if index == 0:  # Ignorar la primera fila de los nombres de las columnas
+                continue
 
-        # Mostrar preguntas del Excel
-        for i, row in df_preguntas.iterrows():
-            pregunta_id = row['item']
-            pregunta_texto = row['pregunta']
-            escala = int(row['escala'])
-            opciones = row['posibles_respuestas'].split(',')[:escala]
+            pregunta = row['pregunta']
 
-            respuesta = st.radio(
-                f"{pregunta_texto}",
-                opciones,
-                index=None,
-                key=f"respuesta_{pregunta_id}"
-            )
-            respuestas[pregunta_id] = respuesta
-
-        # Botón para enviar respuestas
-        if st.button("Enviar Encuesta"):
-            preguntas_faltantes = [
-                k for k, v in respuestas.items() if v is None]
-            if preguntas_faltantes:
-                st.error(
-                    "Por favor, responda todas las preguntas antes de enviar la encuesta.")
+            # Validar si la columna 'posibles respuestas' existe
+            if 'posibles respuestas' in row:
+                posibles_respuestas = str(row['posibles respuestas']).split(
+                    ",")  # Convertir a cadena antes de aplicar split()
             else:
-                guardar_respuestas(respuestas)
-                st.success("¡Gracias por completar la encuesta!")
+                st.error(f"Error: La columna 'posibles respuestas' no se encuentra en la fila {
+                         index + 1}")
+                continue
+
+            # Si la escala es mayor que 1, mostrar un radio button con las respuestas posibles
+            with st.container():
+                st.markdown(
+                    f"<div style='color: blue; border: 1px solid #0056b3; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>"
+                    f"<strong>{index + 1}. {pregunta}</strong></div>",
+                    unsafe_allow_html=True
+                )
+                if len(posibles_respuestas) > 1:
+                    respuesta = st.radio("", options=posibles_respuestas, key=f"pregunta_{
+                                         index}", index=None)
+                else:
+                    respuesta = st.text_input("", key=f"pregunta_{index}")
+                respuestas[f"pregunta_{index}"] = respuesta
+                if respuesta:
+                    contador_respondidas += 1
+
+        # Contador de preguntas respondidas
+        st.info(f"Preguntas respondidas: {
+                contador_respondidas} / {len(preguntas_df)}")
+
+        # --- Botón de Enviar ---
+        enviar_btn = st.button("Enviar Encuesta")
+        if enviar_btn:
+            faltantes = [k for k, v in respuestas.items() if not v]
+            if len(faltantes) == 0 and educacion and ciudad:
+                st.success("¡Gracias por responder la encuesta!")
                 st.balloons()
-                st.write("La encuesta ha sido enviada exitosamente.")
-                st.stop()
+            else:
+                st.error(
+                    "Por favor, responda todas las preguntas y complete los datos demográficos.")
 
 
-# Ejecutar la encuesta
-if __name__ == '__main__':
+# --- Ejecutar aplicación ---
+if __name__ == "__main__":
     mostrar_encuesta()
