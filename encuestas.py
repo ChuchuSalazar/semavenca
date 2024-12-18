@@ -1,108 +1,114 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import random
+import datetime
 
-# Leer el archivo Excel con las preguntas
+# Cargar el archivo de preguntas (asumiendo que tienes un archivo 'preguntas.xlsx' con las preguntas)
 df_preguntas = pd.read_excel("preguntas.xlsx")
 
-# Función para generar un ID aleatorio para la encuesta
+# Función para generar ID aleatorio
 
 
 def generar_id():
-    return str(random.randint(1000, 9999))
+    return random.randint(100000, 999999)
 
-# Función para mostrar la encuesta
+# Mostrar instrucciones y logo
 
 
-def mostrar_encuesta():
-    # Mostrar la fecha y hora del llenado de la encuesta
-    fecha_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    st.write(f"Fecha y Hora de llenado: {fecha_hora}")
-
-    # Título y texto introductorio
-    st.title("Instrucciones")
-    st.markdown("""
-        **Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.**
-        Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar presione Enviar.
+def mostrar_instrucciones():
+    st.markdown(
+        """
+        <style>
+        .titulo {font-size: 20px; color: #000; font-weight: bold;}
+        .texto-intro {background-color: #f2f2f2; padding: 10px; border-radius: 5px;}
+        .recuadro {border: 2px solid #4A90E2; border-radius: 5px; padding: 10px;}
+        .rojo {border: 2px solid red; border-radius: 5px; padding: 10px;}
+        </style>
+        <div class="titulo">Instrucciones</div>
+        <div class="texto-intro">
+        Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.
+        Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione "Enviar".
+        </div>
     """, unsafe_allow_html=True)
 
-    # Contenedor de preguntas demográficas con fondo azul claro
-    with st.container():
-        st.markdown("""
-            <div style="background-color: lightblue; border-radius: 10px; padding: 10px;">
-            <h3>Datos Demográficos</h3>
-            """, unsafe_allow_html=True)
+# Mostrar datos demográficos
 
-        # Número de control (ID aleatorio)
-        id_encuesta = generar_id()
-        st.write(f"ID de la encuesta: {id_encuesta}")
 
-        # Mostrar preguntas demográficas
-        sexo = st.radio("Sexo:", ("Masculino", "Femenino"),
-                        key="sexo", help="Selecciona tu sexo.")
-        edad = st.selectbox("Rango de edad:", [
-                            "18-25", "26-35", "36-45", "46-60", "60+"], key="edad")
-        salario = st.slider("Rango de salario:", 0, 1000000,
-                            (20000, 50000), step=5000, key="salario")
-        ciudad = st.selectbox("Ciudad:", [
-                              "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Maracay"], key="ciudad")
+def mostrar_datos_demograficos():
+    st.sidebar.header("Datos Demográficos")
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Recuadro azul para los datos demográficos
+    with st.sidebar.beta_expander("Datos Demográficos", expanded=True):
+        sexo = st.radio("Sexo", ["Masculino", "Femenino"], key="sexo")
+        edad = st.slider("Edad", 18, 100, 25)
+        ciudad = st.selectbox("Ciudad", [
+                              "Caracas", "Valencia", "Maracay", "Maracaibo", "Barquisimeto"], key="ciudad")
+        salario = st.multiselect("Rango de salario", [
+                                 "Menos de 1.000.000", "1.000.000 - 2.000.000", "Más de 2.000.000"], key="salario")
+        nivel_educativo = st.selectbox("Nivel Educativo", [
+                                       "Primaria", "Secundaria", "Técnico", "Universitario"], key="nivel_educativo")
 
-    # Mostrar preguntas adicionales (más allá de las demográficas)
-    st.markdown("<div style='background-color: lightgray; padding: 10px;'>",
-                unsafe_allow_html=True)
-    st.markdown("<h3>Preguntas</h3>", unsafe_allow_html=True)
+    return sexo, edad, ciudad, salario, nivel_educativo
 
+# Mostrar preguntas
+
+
+def mostrar_preguntas():
     respuestas = {}
-    preguntas_respondidas = set()
-    preguntas_no_respondidas = set()
+    for idx, row in df_preguntas.iterrows():
+        pregunta = row["pregunta"]
+        # Suponiendo que las respuestas están separadas por comas
+        opciones = row["posibles_respuestas"].split(",")
 
-    for index, row in df_preguntas.iterrows():
-        pregunta = row['pregunta']
-        posibles_respuestas = row['posibles_respuestas'].split(',')
-        respuesta = None
-        key = f"pregunta_{index}"
+        # Mostrar la pregunta en un recuadro azul
+        st.markdown(f'<div class="recuadro"><b>{
+                    idx + 1}. {pregunta}</b></div>', unsafe_allow_html=True)
 
-        # Enmarcar las preguntas en un recuadro azul
-        with st.expander(pregunta, expanded=True):
-            respuesta = st.radio(pregunta, posibles_respuestas, key=key)
+        # Mostrar las opciones de respuesta
+        respuesta = st.radio(f"Pregunta {idx + 1}", opciones, key=idx)
 
-        # Controlar las preguntas respondidas y no respondidas
-        if respuesta:
-            preguntas_respondidas.add(index)
-        else:
-            preguntas_no_respondidas.add(index)
+        # Almacenar las respuestas
+        respuestas[idx] = respuesta
 
-        respuestas[index] = respuesta
+    return respuestas
 
-    # Contar las preguntas respondidas
-    total_preguntas = len(df_preguntas)
-    preguntas_respondidas_count = len(preguntas_respondidas)
-    st.write(f"Preguntas respondidas: {
-             preguntas_respondidas_count} / {total_preguntas}")
+# Validar respuestas
 
-    # Botón de envío
-    enviar = st.button("Enviar", key="enviar")
 
-    # Validación de que todas las preguntas sean respondidas
-    if enviar:
-        if len(preguntas_respondidas) == total_preguntas:
-            st.balloons()  # Mostrar globos
-            st.success(
-                "Gracias por participar en la investigación. ¡Tu encuesta ha sido completada!")
-            # Aquí puedes agregar código para guardar las respuestas en la base de datos (Firebase)
-        else:
-            # Colorear en rojo las preguntas no respondidas
-            st.error("Por favor, responda todas las preguntas antes de enviar.")
-            for index in preguntas_no_respondidas:
+def validar_respuestas(respuestas):
+    no_respondidas = [i+1 for i,
+                      resp in enumerate(respuestas.values()) if resp is None]
+    return no_respondidas
+
+
+def app():
+    st.title("Encuesta de Tesis Doctoral")
+    mostrar_instrucciones()
+
+    # Mostrar datos demográficos
+    sexo, edad, ciudad, salario, nivel_educativo = mostrar_datos_demograficos()
+
+    # Mostrar preguntas
+    respuestas = mostrar_preguntas()
+
+    # Botón de enviar
+    if st.button("Enviar"):
+        no_respondidas = validar_respuestas(respuestas)
+
+        if no_respondidas:
+            for i in no_respondidas:
                 st.markdown(
-                    f"**Pregunta {index + 1}: No respondida**", unsafe_allow_html=True)
+                    f"**Pregunta {i} no respondida!**", unsafe_allow_html=True)
+            st.warning(
+                "Por favor, responda todas las preguntas antes de enviar.")
+        else:
+            # Guardar respuestas y mostrar mensaje final
+            # Aquí se pueden guardar las respuestas en una base de datos si es necesario
+            st.success(
+                "Gracias por participar. Sus respuestas han sido registradas.")
+            st.balloons()  # Efecto de globos al finalizar
+            st.stop()  # Detener el proceso después de enviar
 
-    st.markdown("</div>", unsafe_allow_html=True)
 
-
-# Ejecutar la función principal
 if __name__ == "__main__":
-    mostrar_encuesta()
+    app()
