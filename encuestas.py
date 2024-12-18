@@ -3,207 +3,137 @@ import pandas as pd
 import random
 from datetime import datetime
 
-# Generar un ID aleatorio
-
-
-def generar_id():
-    return random.randint(100000, 999999)
-
-# Cargar preguntas desde Excel
+# Cargar el archivo Excel
 
 
 def cargar_preguntas():
     try:
-        # Leer el archivo Excel asegurando que la primera fila sea usada como encabezado
-        preguntas_df = pd.read_excel("preguntas.xlsx")
+        preguntas_df = pd.read_excel('preguntas.xlsx')
         return preguntas_df
-    except FileNotFoundError:
-        st.error(
-            "Error: No se encontró el archivo preguntas.xlsx. Asegúrate de colocarlo en la misma carpeta.")
+    except Exception as e:
+        st.error(f"Error al cargar el archivo Excel: {e}")
         return None
 
-# Función principal
+# Mostrar el logo y la fecha/hora
+
+
+def mostrar_logo_y_fecha():
+    # Utilizar 'use_container_width' en vez de 'use_column_width'
+    st.image('logo_ucab.jpg', width=150, use_container_width=True)
+    st.markdown(f"### Encuesta de Investigación")
+    st.markdown(
+        f"**Fecha y Hora de llenado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}**")
+
+# Función para mostrar el texto introductorio con fondo gris claro
+
+
+def mostrar_texto_introduccion():
+    st.markdown("""
+        <div style="background-color:#f2f2f2;padding:10px;border-radius:5px;">
+            <h3>Gracias por participar en esta encuesta. La misma es anónima y tiene fines estrictamente académicos para una tesis doctoral.</h3>
+            <p>Lea cuidadosamente y seleccione la opción que considere pertinente. Al culminar, presione Enviar.</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+# Generar ID aleatorio para la encuesta
+
+
+def generar_id_encuesta():
+    return random.randint(100000, 999999)
+
+# Mostrar los datos demográficos
+
+
+def mostrar_datos_demograficos():
+    st.markdown("### Información General")
+
+    # Solo una opción seleccionable: radio buttons
+    sexo = st.radio("Sexo:", ["Hombre", "Mujer"], key="sexo")
+
+    # Selección única de rango de edad con radio buttons
+    edad = st.radio("Selecciona tu rango de edad:", [
+                    "18-25", "26-35", "36-45", "46-60", "61+"], key="edad")
+
+    # Selección única de rango de salario con radio buttons
+    salario = st.radio("Selecciona tu rango de salario:", [
+                       "0-1,000", "1,001-3,000", "3,001-5,000", "5,001+"], key="salario")
+
+    # Ciudad con selectbox (solo una opción, no editable)
+    ciudad = st.selectbox("Selecciona tu ciudad:", [
+                          "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Mérida"], index=0, key="ciudad")
+
+# Función para mostrar las preguntas
+
+
+def mostrar_preguntas(preguntas_df):
+    preguntas_respondidas = 0
+    preguntas_no_respondidas = []
+    respuestas = {}
+
+    for index, row in preguntas_df.iterrows():
+        pregunta = row['pregunta']
+        # Corregir la referencia a 'posibles_respuestas'
+        opciones = row['posibles_respuestas'].split(',')
+
+        # Solo se podrá seleccionar una opción por pregunta (radio button)
+        respuesta = st.radio(f"{index + 1}. {pregunta}",
+                             opciones, key=f"pregunta_{index}")
+
+        if respuesta:
+            respuestas[f"pregunta_{index}"] = respuesta
+            preguntas_respondidas += 1
+        else:
+            preguntas_no_respondidas.append(index)
+
+    return respuestas, preguntas_respondidas, preguntas_no_respondidas
+
+# Función de validación
+
+
+def validar_respuestas(preguntas_no_respondidas):
+    if preguntas_no_respondidas:
+        for index in preguntas_no_respondidas:
+            st.markdown(f"<div style='border:2px solid red;padding:10px;margin:5px;border-radius:5px;'>{
+                        index + 1} - Pregunta no respondida</div>", unsafe_allow_html=True)
+        st.warning("Por favor, responda todas las preguntas.")
+        return False
+    return True
+
+# Función principal para mostrar la encuesta
 
 
 def mostrar_encuesta():
-    st.set_page_config(page_title="Encuesta UCAB", layout="wide")
-
-    # --- Encabezado ---
-    numero_control = generar_id()
-    fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    col1, col2 = st.columns([8, 2])
-    with col1:
-        st.title("Encuesta de Investigación - UCAB")
-        st.subheader(f"Fecha y hora: {fecha_hora}")
-        st.write(f"**Número de Control:** {numero_control}")
-    with col2:
-        # Actualizado para evitar la advertencia
-        st.image("logo_ucab.jpg", use_container_width=True)
-
-    # --- CSS Personalizado ---
-    st.markdown("""
-        <style>
-            .marco-azul {
-                border: 2px solid #0056b3;
-                background-color: #e6f0ff;
-                padding: 20px;
-                border-radius: 10px;
-            }
-            .titulo {
-                color: #0056b3;
-                text-align: center;
-                font-size: 20px;
-                font-weight: bold;
-            }
-            .boton-grande label {
-                display: inline-block;
-                padding: 15px;
-                margin: 5px;
-                border: 2px solid #0056b3;
-                border-radius: 5px;
-                background-color: #f5f9ff;
-                color: #0056b3;
-                font-weight: bold;
-                text-align: center;
-                cursor: pointer;
-                width: 150px;
-            }
-            .radio label {
-                margin-right: 10px;
-            }
-            .boton-sexo {
-                display: flex;
-                flex-direction: column;  /* Colocarlos uno debajo del otro */
-                gap: 10px;  /* Añadir espacio entre los botones */
-                align-items: flex-start;
-            }
-            .red-border {
-                border: 2px solid red;
-                padding: 10px;
-                border-radius: 5px;
-                margin-bottom: 10px;
-            }
-            .blue-border {
-                border: 2px solid blue;
-                padding: 10px;
-                border-radius: 5px;
-                margin-bottom: 10px;
-            }
-            .small-selectbox select {
-                width: 150px;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
-    # --- Marco Azul Claro para Información General ---
-    st.markdown('<div class="marco-azul">', unsafe_allow_html=True)
-    st.markdown('<div class="titulo">Información General</div>',
-                unsafe_allow_html=True)
-
-    # --- Datos Demográficos ---
-    # Género
-    st.markdown("**Seleccione su género:**")
-    sexo = None  # Establecer como None para desmarcar al inicio
-
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        # Los valores se inicializan como desmarcados
-        sexo = st.radio("Sexo:", options=[
-                        "Hombre", "Mujer", "Otro"], key="sexo", index=None)
-
-    # Rango de Edad
-    st.markdown("**Seleccione su rango de edad:**")
-    rangos_edad = ["18-25", "26-35", "36-45", "46-55", "56+"]
-    rango_edad = st.radio("Edad:", options=rangos_edad,
-                          key="rango_edad", index=None)  # Desmarcado
-
-    # Rango de Salario
-    st.markdown("**Seleccione su rango de salario mensual (en USD):**")
-    rangos_salario = ["0-1000", "1001-5000", "5001-10000", "10001+"]
-    salario = st.radio("Salario:", options=rangos_salario,
-                       key="rango_salario", index=None)  # Desmarcado
-
-    # Nivel Educativo
-    st.markdown("**Seleccione su nivel educativo:**")
-    educacion = st.radio(
-        "Nivel educativo:",
-        options=["Primaria", "Secundaria", "Universitaria", "Posgrado"],
-        key="nivel_educativo",
-        index=None  # Desmarcado
-    )
-
-    # Ciudad
-    st.markdown("**Ciudad de residencia:**")
-    ciudades = ["Caracas", "Maracaibo", "Valencia",
-                "Barquisimeto", "Mérida", "San Cristóbal"]
-    ciudad = st.selectbox("Selecciona tu ciudad:", options=ciudades, index=0,
-                          disabled=True, key="ciudad")  # Caracas por defecto, no editable
-
-    st.markdown("</div>", unsafe_allow_html=True)  # Cerrar marco azul
-
-    # --- Cargar preguntas ---
-    st.markdown("### Preguntas de la Encuesta")
     preguntas_df = cargar_preguntas()
-    if preguntas_df is not None:
-        respuestas = {}
-        contador_respondidas = 0
+    if preguntas_df is None:
+        return
 
-        # Asegurarse de que las filas comienzan desde la segunda fila de datos (evitar usar la primera fila de encabezado)
-        for index, row in preguntas_df.iterrows():
-            if index == 0:  # Ignorar la primera fila de los nombres de las columnas
-                continue
+    mostrar_logo_y_fecha()
+    mostrar_texto_introduccion()
 
-            pregunta = row['pregunta']
+    # Mostrar datos demográficos
+    mostrar_datos_demograficos()
 
-            # Validar si la columna 'posibles respuestas' existe
-            if 'posibles respuestas' in row:
-                posibles_respuestas = str(row['posibles respuestas']).split(
-                    ",")  # Convertir a cadena antes de aplicar split()
-            else:
-                st.error(f"Error: La columna 'posibles respuestas' no se encuentra en la fila {
-                         index + 1}")
-                continue
+    # Mostrar preguntas
+    respuestas, preguntas_respondidas, preguntas_no_respondidas = mostrar_preguntas(
+        preguntas_df)
 
-            # Si la escala es mayor que 1, mostrar un radio button con las respuestas posibles
-            with st.container():
-                st.markdown(
-                    f"<div style='color: blue; border: 1px solid #0056b3; padding: 10px; border-radius: 5px; margin-bottom: 5px;' class='blue-border'>"
-                    f"<strong>{index + 1}. {pregunta}</strong></div>",
-                    unsafe_allow_html=True
-                )
-                if len(posibles_respuestas) > 1:
-                    respuesta = st.radio("", options=posibles_respuestas, key=f"pregunta_{
-                                         index}", index=None)
-                else:
-                    respuesta = st.text_input("", key=f"pregunta_{index}")
-                respuestas[f"pregunta_{index}"] = respuesta
-                if respuesta:
-                    contador_respondidas += 1
+    # Mostrar el contador de preguntas respondidas
+    st.sidebar.markdown(
+        f"**Preguntas Respondidas:** {preguntas_respondidas}/{len(preguntas_df)}")
 
-        # Contador de preguntas respondidas
-        st.info(f"Preguntas respondidas: {
-                contador_respondidas} / {len(preguntas_df)}")
-
-        # --- Botón de Enviar ---
-        enviar_btn = st.button("Enviar Encuesta")
-        if enviar_btn:
-            faltantes = [k for k, v in respuestas.items() if not v]
-            # Validar campos demográficos
-            if not (sexo and rango_edad and salario and educacion and ciudad):
-                st.warning(
-                    "Por favor, responda todas las preguntas y complete los datos demográficos.")
-            elif len(faltantes) == 0:
-                st.success("¡Gracias por responder la encuesta!")
-                st.balloons()
-            else:
-                st.warning("Por favor, responda todas las preguntas.")
-                # Marcar las preguntas faltantes en rojo
-                for faltante in faltantes:
-                    st.markdown(f"<div class='red-border'><strong>{
-                                faltante}</strong> está incompleta.</div>", unsafe_allow_html=True)
+    # Botón de envío
+    if st.button("Enviar"):
+        if validar_respuestas(preguntas_no_respondidas):
+            # Guardar las respuestas en la base de datos (esto se debe hacer aquí)
+            encuesta_id = generar_id_encuesta()
+            st.success(f"Gracias por participar en la investigación. Su ID es: {
+                       encuesta_id}")
+            st.balloons()  # Efecto de globos
+            st.experimental_rerun()  # Recargar la página para bloquear las preguntas
+        else:
+            st.warning("Por favor, responda todas las preguntas.")
 
 
-# --- Ejecutar aplicación ---
+# Ejecutar la encuesta
 if __name__ == "__main__":
     mostrar_encuesta()
