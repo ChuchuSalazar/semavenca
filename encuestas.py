@@ -74,9 +74,24 @@ def mostrar_encuesta():
             }
             .boton-sexo {
                 display: flex;
-                justify-content: space-between;
-                gap: 10px;
-                align-items: center;
+                flex-direction: column;  /* Colocarlos uno debajo del otro */
+                gap: 10px;  /* Añadir espacio entre los botones */
+                align-items: flex-start;
+            }
+            .red-border {
+                border: 2px solid red;
+                padding: 10px;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
+            .blue-border {
+                border: 2px solid blue;
+                padding: 10px;
+                border-radius: 5px;
+                margin-bottom: 10px;
+            }
+            .small-selectbox select {
+                width: 150px;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -89,37 +104,41 @@ def mostrar_encuesta():
     # --- Datos Demográficos ---
     # Género
     st.markdown("**Seleccione su género:**")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        sexo = st.button("🧑 Hombre", key="hombre")
-    with col2:
-        sexo = st.button("👩 Mujer", key="mujer")
-    with col3:
-        sexo = st.button("🌈 Otro", key="otro")
+    sexo = None  # Establecer como None para desmarcar al inicio
 
-    # Rango de Edad - Usar las opciones del código
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        # Los valores se inicializan como desmarcados
+        sexo = st.radio("Sexo:", options=[
+                        "Hombre", "Mujer", "Otro"], key="sexo", index=None)
+
+    # Rango de Edad
     st.markdown("**Seleccione su rango de edad:**")
     rangos_edad = ["18-25", "26-35", "36-45", "46-55", "56+"]
-    rango_edad = st.radio("Edad:", options=rangos_edad, key="rango_edad")
+    rango_edad = st.radio("Edad:", options=rangos_edad,
+                          key="rango_edad", index=None)  # Desmarcado
 
-    # Rango de Salario - Usar las opciones del código
+    # Rango de Salario
     st.markdown("**Seleccione su rango de salario mensual (en USD):**")
     rangos_salario = ["0-1000", "1001-5000", "5001-10000", "10001+"]
-    salario = st.radio("Salario:", options=rangos_salario, key="rango_salario")
+    salario = st.radio("Salario:", options=rangos_salario,
+                       key="rango_salario", index=None)  # Desmarcado
 
     # Nivel Educativo
     st.markdown("**Seleccione su nivel educativo:**")
     educacion = st.radio(
         "Nivel educativo:",
         options=["Primaria", "Secundaria", "Universitaria", "Posgrado"],
-        horizontal=True,
-        index=None,
-        label_visibility="collapsed"
+        key="nivel_educativo",
+        index=None  # Desmarcado
     )
 
     # Ciudad
     st.markdown("**Ciudad de residencia:**")
-    ciudad = st.text_input("Ciudad:", "Caracas")
+    ciudades = ["Caracas", "Maracaibo", "Valencia",
+                "Barquisimeto", "Mérida", "San Cristóbal"]
+    ciudad = st.selectbox("Selecciona tu ciudad:", options=ciudades, index=0,
+                          disabled=True, key="ciudad")  # Caracas por defecto, no editable
 
     st.markdown("</div>", unsafe_allow_html=True)  # Cerrar marco azul
 
@@ -149,7 +168,7 @@ def mostrar_encuesta():
             # Si la escala es mayor que 1, mostrar un radio button con las respuestas posibles
             with st.container():
                 st.markdown(
-                    f"<div style='color: blue; border: 1px solid #0056b3; padding: 10px; border-radius: 5px; margin-bottom: 5px;'>"
+                    f"<div style='color: blue; border: 1px solid #0056b3; padding: 10px; border-radius: 5px; margin-bottom: 5px;' class='blue-border'>"
                     f"<strong>{index + 1}. {pregunta}</strong></div>",
                     unsafe_allow_html=True
                 )
@@ -170,12 +189,19 @@ def mostrar_encuesta():
         enviar_btn = st.button("Enviar Encuesta")
         if enviar_btn:
             faltantes = [k for k, v in respuestas.items() if not v]
-            if len(faltantes) == 0 and educacion and ciudad:
+            # Validar campos demográficos
+            if not (sexo and rango_edad and salario and educacion and ciudad):
+                st.warning(
+                    "Por favor, responda todas las preguntas y complete los datos demográficos.")
+            elif len(faltantes) == 0:
                 st.success("¡Gracias por responder la encuesta!")
                 st.balloons()
             else:
-                st.error(
-                    "Por favor, responda todas las preguntas y complete los datos demográficos.")
+                st.warning("Por favor, responda todas las preguntas.")
+                # Marcar las preguntas faltantes en rojo
+                for faltante in faltantes:
+                    st.markdown(f"<div class='red-border'><strong>{
+                                faltante}</strong> está incompleta.</div>", unsafe_allow_html=True)
 
 
 # --- Ejecutar aplicación ---
